@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tbt-engine"
+version = "0.1.0"
+description = "A minimal historical backtesting engine"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas",
+    "yfinance",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "pandas-stubs",
+    "pyright",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py314"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.pyright]
+include = ["engine", "main.py"]
+venvPath = "/home/admin/.pyenv/versions"
+venv = "tbt-engine"
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
