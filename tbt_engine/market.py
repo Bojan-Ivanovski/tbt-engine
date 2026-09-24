@@ -4,7 +4,7 @@ from typing import Any, Dict, Iterable, KeysView
 
 import pandas as pd
 
-from engine.providers.provider import Provider
+from tbt_engine.providers.provider import Provider
 
 
 class MarketAsset:

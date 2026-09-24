@@ -1,43 +1,13 @@
 import logging
-from dataclasses import dataclass
 from datetime import date
-from typing import List
 
-from engine.market import Market, MarketState
-from engine.portfolio import Portfolio, PortfolioState
-from engine.providers.provider import Provider
-from engine.strategy import Strategy
+from tbt_engine.market import Market, MarketState
+from tbt_engine.portfolio import Portfolio, PortfolioState
+from tbt_engine.providers.provider import Provider
+from tbt_engine.result import BacktestResult, EquityPoint, Trade
+from tbt_engine.strategy import Strategy
 
-logger = logging.getLogger("trader")
-
-
-@dataclass(frozen=True)
-class Trade:
-    time: str
-    symbol: str
-    side: str
-    quantity: float
-    price: float
-
-
-@dataclass(frozen=True)
-class EquityPoint:
-    time: str
-    equity: float
-
-
-@dataclass
-class BacktestResult:
-    starting_equity: float
-    ending_equity: float
-    trades: List[Trade]
-    equity_history: List[EquityPoint]
-
-    @property
-    def total_return_pct(self) -> float:
-        if self.starting_equity == 0:
-            return 0.0
-        return ((self.ending_equity / self.starting_equity) - 1.0) * 100.0
+logger = logging.getLogger(__name__)
 
 
 class Engine:
@@ -50,7 +20,7 @@ class Engine:
         initial_balance: float = 1000.0,
     ):
         if provider is None:
-            from engine.providers.yahoo_provider import YahooProvider
+            from tbt_engine.providers.yahoo_provider import YahooProvider
 
             provider = YahooProvider()
 
@@ -71,8 +41,8 @@ class Engine:
         )
         market.set_assets(strategy.define_market())
 
-        trades: List[Trade] = []
-        equity_history: List[EquityPoint] = []
+        trades: list[Trade] = []
+        equity_history: list[EquityPoint] = []
 
         while market.next_candle() < market.final_candle:
             market_state = MarketState(market)

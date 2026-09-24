@@ -1,6 +1,6 @@
 from typing import Dict
 
-from engine.asset import Asset
+from tbt_engine.asset import Asset
 
 
 class Portfolio:

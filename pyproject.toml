@@ -16,23 +16,32 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "black",
+    "build",
     "isort",
     "pandas-stubs",
     "pyright",
 ]
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tbt_engine*"]
+exclude = ["examples*"]
+
+[tool.setuptools.package-data]
+tbt_engine = ["py.typed"]
+
 [tool.black]
 line-length = 100
-target-version = ["py314"]
+target-version = ["py311"]
 
 [tool.isort]
 profile = "black"
 line_length = 100
 
 [tool.pyright]
-include = ["engine", "main.py"]
-venvPath = "/home/admin/.pyenv/versions"
-venv = "tbt-engine"
+include = ["tbt_engine", "examples"]
+venvPath = "."
+venv = ".venv"
 pythonVersion = "3.14"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false

@@ -5,9 +5,9 @@ from typing import Any, Optional, cast
 import pandas as pd
 import yfinance as yf
 
-from engine.providers.provider import Provider
+from tbt_engine.providers.provider import Provider
 
-logger = logging.getLogger("trader")
+logger = logging.getLogger(__name__)
 
 
 class YahooProvider(Provider):
