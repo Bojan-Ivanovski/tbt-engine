@@ -24,6 +24,12 @@ class MarketAsset:
             raise ValueError(f"Invalid closing price for {self.symbol} at candle {candle}")
         return close
 
+    def get_open(self, candle: int) -> float:
+        open_price = float(self.history["Open"].iloc[candle])
+        if not math.isfinite(open_price) or open_price <= 0:
+            raise ValueError(f"Invalid opening price for {self.symbol} at candle {candle}")
+        return open_price
+
     def get_candle_time_iso(self, candle: int) -> str:
         raw_timestamp = self.history.index[candle]
         if isinstance(raw_timestamp, date) and not isinstance(raw_timestamp, datetime):
@@ -57,7 +63,7 @@ class Market:
         self.final_candle = 0
 
     def set_assets(self, symbols: Iterable[str]) -> None:
-        normalized_symbols = list(dict.fromkeys(symbol.upper() for symbol in symbols))
+        normalized_symbols = sorted(set(symbol.upper() for symbol in symbols))
         if not normalized_symbols:
             raise ValueError("A strategy must define at least one symbol")
 
@@ -70,8 +76,10 @@ class Market:
             )
             if history.empty:
                 raise ValueError(f"No price history returned for {symbol}")
-            if "Close" not in history.columns:
-                raise ValueError(f"Price history for {symbol} has no Close column")
+            missing_columns = {"Open", "Close"}.difference(history.columns)
+            if missing_columns:
+                missing = ", ".join(sorted(missing_columns))
+                raise ValueError(f"Price history for {symbol} is missing columns: {missing}")
             self.assets[symbol] = MarketAsset(symbol, history.sort_index())
 
         common_index: pd.Index[Any] | None = None
@@ -96,19 +104,40 @@ class Market:
 
 
 class MarketState:
-    def __init__(self, market: Market):
-        self.assets = market.assets
-        self.current_candle = market.current_candle
+    def __init__(self, market: Market, last_closed_candle: int | None = None):
+        self._assets = market.assets
+        self._current_candle = market.current_candle
+        self._last_closed_candle = (
+            market.current_candle if last_closed_candle is None else last_closed_candle
+        )
 
     def get_all_symbols(self) -> KeysView[str]:
-        return self.assets.keys()
+        return self._assets.keys()
 
     def get_past_data(self, symbol: str) -> pd.DataFrame:
-        return self.assets[symbol].get_candle_range(self.current_candle)
-
-    def get_latest_closed(self, symbol: str) -> float:
-        return self.assets[symbol].get_close(self.current_candle)
+        return self._assets[symbol].get_candle_range(self._last_closed_candle).copy()
 
     def get_market_time_iso(self) -> str:
-        first_asset = next(iter(self.assets.values()))
-        return first_asset.get_candle_time_iso(self.current_candle)
+        first_asset = next(iter(self._assets.values()))
+        return first_asset.get_candle_time_iso(self._current_candle)
+
+
+class BeforeOpenMarketState(MarketState):
+    def __init__(self, market: Market):
+        super().__init__(market, market.current_candle - 1)
+
+
+class OpenMarketState(MarketState):
+    def __init__(self, market: Market):
+        super().__init__(market, market.current_candle - 1)
+
+    def get_current_open(self, symbol: str) -> float:
+        return self._assets[symbol].get_open(self._current_candle)
+
+
+class ClosedMarketState(MarketState):
+    def __init__(self, market: Market):
+        super().__init__(market, market.current_candle)
+
+    def get_latest_closed(self, symbol: str) -> float:
+        return self._assets[symbol].get_close(self._last_closed_candle)

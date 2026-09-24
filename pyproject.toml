@@ -39,7 +39,7 @@ profile = "black"
 line_length = 100
 
 [tool.pyright]
-include = ["tbt_engine", "examples"]
+include = ["tbt_engine", "examples", "tests"]
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.14"

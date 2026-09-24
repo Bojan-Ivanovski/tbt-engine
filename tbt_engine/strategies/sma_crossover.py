@@ -1,9 +1,13 @@
-from tbt_engine.asset import Asset
-from tbt_engine.market import MarketState
+from tbt_engine.market import ClosedMarketState
+from tbt_engine.orders import (
+    ExecutionTime,
+    OrderIntent,
+    OrderState,
+    Side,
+    StrategyCommand,
+    SubmitOrder,
+)
 from tbt_engine.portfolio import PortfolioState
-from tbt_engine.signals.buy import Buy
-from tbt_engine.signals.sell import Sell
-from tbt_engine.signals.signal import Signal
 from tbt_engine.strategy import Strategy
 
 
@@ -27,9 +31,14 @@ class SmaCrossoverStrategy(Strategy):
     def define_market(self) -> list[str]:
         return self.symbols
 
-    def execute(self, market: MarketState, portfolio: PortfolioState) -> list[Signal]:
+    def after_close(
+        self,
+        market: ClosedMarketState,
+        portfolio: PortfolioState,
+        orders: OrderState,
+    ) -> list[StrategyCommand]:
         holdings = portfolio.holdings()
-        signals: list[Signal] = []
+        commands: list[StrategyCommand] = []
 
         for symbol in market.get_all_symbols():
             candles = market.get_past_data(symbol)
@@ -49,8 +58,26 @@ class SmaCrossoverStrategy(Strategy):
             if crossed_up and held_quantity == 0:
                 price = market.get_latest_closed(symbol)
                 quantity = (portfolio.balance() * self.allocation) / price
-                signals.append(Buy(Asset(symbol, quantity)))
+                commands.append(
+                    SubmitOrder(
+                        OrderIntent(
+                            symbol=symbol,
+                            side=Side.BUY,
+                            quantity=quantity,
+                            execution_time=ExecutionTime.NEXT_OPEN,
+                        )
+                    )
+                )
             elif crossed_down and held_quantity > 0:
-                signals.append(Sell(Asset(symbol, held_quantity)))
+                commands.append(
+                    SubmitOrder(
+                        OrderIntent(
+                            symbol=symbol,
+                            side=Side.SELL,
+                            quantity=held_quantity,
+                            execution_time=ExecutionTime.NEXT_OPEN,
+                        )
+                    )
+                )
 
-        return signals
+        return commands
