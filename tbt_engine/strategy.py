@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
-from tbt_engine.market import MarketState
+from tbt_engine.market import BeforeOpenMarketState, ClosedMarketState, OpenMarketState
+from tbt_engine.orders import OrderState, StrategyCommand
 from tbt_engine.portfolio import PortfolioState
-from tbt_engine.signals.signal import Signal
 
 
 class Strategy(ABC):
@@ -13,6 +13,26 @@ class Strategy(ABC):
     def define_market(self) -> list[str]:
         raise NotImplementedError
 
-    @abstractmethod
-    def execute(self, market: MarketState, portfolio: PortfolioState) -> list[Signal]:
-        raise NotImplementedError
+    def before_open(
+        self,
+        market: BeforeOpenMarketState,
+        portfolio: PortfolioState,
+        orders: OrderState,
+    ) -> list[StrategyCommand]:
+        return []
+
+    def execute(
+        self,
+        market: OpenMarketState,
+        portfolio: PortfolioState,
+        orders: OrderState,
+    ) -> list[StrategyCommand]:
+        return []
+
+    def after_close(
+        self,
+        market: ClosedMarketState,
+        portfolio: PortfolioState,
+        orders: OrderState,
+    ) -> list[StrategyCommand]:
+        return []
