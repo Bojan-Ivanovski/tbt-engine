@@ -1,8 +1,6 @@
 import math
 from dataclasses import dataclass, field
-from typing import Dict
 
-from tbt_engine.core.asset import Asset
 from tbt_engine.core.costs import CostedFill
 from tbt_engine.core.ledger import LedgerPosting, PortfolioLedger
 
@@ -75,10 +73,8 @@ class Portfolio:
         return self._ledger.base_currency
 
     @property
-    def holdings(self) -> Dict[str, Asset]:
-        return {
-            symbol: Asset(symbol, quantity) for symbol, quantity in self._ledger.state.positions
-        }
+    def holdings(self) -> dict[str, float]:
+        return dict(self._ledger.state.positions)
 
     def post(self, costed_fills: tuple[CostedFill, ...]) -> LedgerPosting:
         return self._ledger.post(costed_fills)
@@ -88,10 +84,7 @@ class PortfolioState:
     def __init__(self, portfolio: Portfolio):
         self._balance = portfolio.balance
         self._currency = portfolio.currency
-        self._holdings = {
-            symbol: Asset(asset.symbol, asset.quantity)
-            for symbol, asset in portfolio.holdings.items()
-        }
+        self._holdings = portfolio.holdings
 
     def balance(self) -> float:
         return self._balance
@@ -99,10 +92,8 @@ class PortfolioState:
     def currency(self) -> str:
         return self._currency
 
-    def holdings(self) -> Dict[str, Asset]:
-        return {
-            symbol: Asset(asset.symbol, asset.quantity) for symbol, asset in self._holdings.items()
-        }
+    def holdings(self) -> dict[str, float]:
+        return dict(self._holdings)
 
     def __repr__(self):
         return f"({self._balance},{self._holdings})"

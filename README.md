@@ -39,7 +39,7 @@ The supported API is exported directly from `tbt_engine`:
 from tbt_engine import Engine, Market, Strategy
 ```
 
-Market-data providers, phase-specific market snapshots, orders, portfolio snapshots, result types, and assets are also available from the top-level package. To use another market data source, implement `Provider.get_history()` and pass the provider to `Engine`. Price history must contain `Open` and `Close` columns.
+Market-data providers, phase-specific market snapshots, orders, portfolio snapshots, and result types are also available from the top-level package. To use another market data source, implement `Provider.get_history()` and pass the provider to `Engine`. Price history must contain `Open` and `Close` columns.
 
 The starting state is supplied as one immutable portfolio definition:
 
@@ -127,7 +127,7 @@ Each immutable `PortfolioValuation` records its time, phase, model, currency, ca
 
 Simulation output is observed through a replaceable `ResultCollector` supplied with `Engine(result_collector=...)`. The collector receives immutable order snapshots and lifecycle events, fills, execution costs, ledger entries, and valuations in deterministic simulation order. It cannot change the records or participate in strategy, execution, accounting, or valuation decisions.
 
-The default `InMemoryResultCollector` produces the existing `BacktestResult`. Compatibility trades are derived from authoritative fills, while equity history and ending equity are derived from authoritative valuation records instead of being maintained as separate engine state. A collector is reset at the beginning of every run and finalized once after all end-of-data order events have been observed.
+The default `InMemoryResultCollector` produces the existing `BacktestResult`. Trades are derived from authoritative fills, while equity history and ending equity are derived from authoritative valuation records instead of being maintained as separate engine state. A collector is reset at the beginning of every run and finalized once after all end-of-data order events have been observed.
 
 ## Run the example
 
