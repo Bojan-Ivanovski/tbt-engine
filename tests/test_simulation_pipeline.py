@@ -5,8 +5,11 @@ import pandas as pd
 
 from tbt_engine import (
     CancelOrder,
+    ClosePriceValuationModel,
+    DailyBarExecutionModel,
     Engine,
     ExecutionTime,
+    InMemoryResultCollector,
     OrderEventType,
     OrderIntent,
     OrderState,
@@ -14,11 +17,14 @@ from tbt_engine import (
     PortfolioState,
     Provider,
     Side,
+    SimulationPipeline,
     Strategy,
     StrategyCommand,
     SubmitOrder,
+    ZeroTransactionCostModel,
 )
-from tbt_engine.market import BeforeOpenMarketState, ClosedMarketState, OpenMarketState
+from tbt_engine.market import BeforeOpenMarketState, ClosedMarketState, Market, OpenMarketState
+from tbt_engine.portfolio import Portfolio
 
 
 class InMemoryProvider(Provider):
@@ -134,6 +140,29 @@ class SessionCloseStrategy(Strategy):
 
 
 class SimulationPipelineTests(unittest.TestCase):
+    def test_direct_pipeline_run_matches_engine_result(self) -> None:
+        engine_strategy = NextOpenStrategy()
+        pipeline_strategy = NextOpenStrategy()
+        expected = Engine(provider=InMemoryProvider(), initial_balance=100).start(engine_strategy)
+        market = Market(provider=InMemoryProvider(), start=date(2000, 1, 1))
+        market.set_assets(pipeline_strategy.define_market())
+        portfolio = Portfolio(
+            100,
+            currency="USD",
+            opened_at=date(2000, 1, 1).isoformat(),
+        )
+        pipeline = SimulationPipeline(
+            execution_model=DailyBarExecutionModel(),
+            transaction_cost_model=ZeroTransactionCostModel(),
+            valuation_model=ClosePriceValuationModel(),
+            result_collector=InMemoryResultCollector(),
+        )
+
+        actual = pipeline.run(pipeline_strategy, market, portfolio)
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(pipeline_strategy.observations, engine_strategy.observations)
+
     def test_after_close_order_fills_at_next_open(self) -> None:
         strategy = NextOpenStrategy()
 
