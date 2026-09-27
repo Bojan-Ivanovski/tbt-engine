@@ -5,7 +5,7 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Mapping
 
-from tbt_engine.ledger import LedgerState
+from tbt_engine.core.ledger import LedgerState
 
 
 class ValuationPhase(str, Enum):
