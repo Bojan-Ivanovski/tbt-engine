@@ -61,6 +61,28 @@ Execution models receive an eligible order and an immutable `ExecutionMarketStat
 
 Custom models can be passed to `Engine(execution_model=...)`. Pending partial quantities remain eligible at later matching execution events, and all fills are available through `BacktestResult.fills`.
 
+## Transaction costs
+
+The engine uses `ZeroTransactionCostModel` by default, preserving the fill prices and accounting behavior of a backtest with no transaction costs. A deterministic standard model can be injected directly:
+
+```python
+from tbt_engine import Engine, StandardTransactionCostModel
+
+engine = Engine(
+    transaction_cost_model=StandardTransactionCostModel(
+        commission_per_order=1.00,
+        commission_per_unit=0.005,
+        fee_rate=0.0001,
+        spread_bps=2.0,
+        slippage_bps=1.0,
+    )
+)
+```
+
+Spread and slippage adjust the execution price upward for buys and downward for sells. Commissions and fees are direct cash charges. Each accepted fill has a stable ID and preserves its pre-cost `reference_price`; its immutable `ExecutionCost` breakdown, currency, model identity, and parameters are available in `BacktestResult.execution_costs`. A model's JSON-serializable description is exposed through `TransactionCostModel.configuration` for future run-manifest integration.
+
+Custom `TransactionCostModel` implementations can declare additional `MarketDataCapability` requirements. The engine rejects a model before simulation when its requirements are unavailable instead of silently estimating missing quote, trade, volatility, volume, or order-book data. Model construction is programmatic; project-wide configuration integration is intentionally separate.
+
 ## Run the example
 
 ```bash
@@ -74,4 +96,5 @@ The included example applies a 5-day/20-day moving-average crossover to AAPL, NV
 - accepted trades
 - orders and their lifecycle events
 - explicit fills linked to their originating orders
+- transaction-cost breakdowns linked to their fills
 - equity history

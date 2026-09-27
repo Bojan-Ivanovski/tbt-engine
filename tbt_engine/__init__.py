@@ -1,6 +1,14 @@
 """Public API for TBT Engine."""
 
 from tbt_engine.asset import Asset
+from tbt_engine.costs import (
+    CostedFill,
+    ExecutionCost,
+    MarketDataCapability,
+    StandardTransactionCostModel,
+    TransactionCostModel,
+    ZeroTransactionCostModel,
+)
 from tbt_engine.engine import Engine, SimulationPhase
 from tbt_engine.execution import (
     DailyBarExecutionModel,
@@ -10,6 +18,7 @@ from tbt_engine.execution import (
     ExecutionOutcomeStatus,
     ExecutionPhase,
     Fill,
+    FillId,
 )
 from tbt_engine.market import (
     BeforeOpenMarketState,
@@ -44,17 +53,21 @@ __all__ = [
     "Buy",
     "CancelOrder",
     "ClosedMarketState",
+    "CostedFill",
     "DailyBarExecutionModel",
     "Engine",
     "EquityPoint",
     "ExecutionTime",
     "ExecutionMarketState",
+    "ExecutionCost",
     "ExecutionModel",
     "ExecutionOutcome",
     "ExecutionOutcomeStatus",
     "ExecutionPhase",
     "Fill",
+    "FillId",
     "MarketState",
+    "MarketDataCapability",
     "OpenMarketState",
     "Order",
     "OrderEvent",
@@ -69,9 +82,12 @@ __all__ = [
     "Signal",
     "Side",
     "SimulationPhase",
+    "StandardTransactionCostModel",
     "Strategy",
     "StrategyCommand",
     "SubmitOrder",
     "Trade",
+    "TransactionCostModel",
     "YahooProvider",
+    "ZeroTransactionCostModel",
 ]
