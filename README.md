@@ -57,7 +57,7 @@ engine = Engine(
 
 The Market registers the union of `Strategy.define_assets()` and initial-position symbols. Strategy snapshots, order validation, and execution are restricted to the strategy-defined subset, while complete registered data remains available for portfolio valuation. Initial quantities enter the ledger as opening state rather than simulated trades, and their first available opening prices establish starting equity before any strategy command or execution event.
 
-The simulation-domain implementation lives under `tbt_engine.core`. Consumers should normally use the package-level exports above; internal module imports use the `tbt_engine.core` namespace. Providers, signals, and reusable strategy implementations remain organized in their existing domain packages.
+The public `Engine` setup facade lives at `tbt_engine.engine`, while simulation-domain implementation lives under `tbt_engine.core`. Extensible families are organized as packages: `collection`, `costs`, `execution`, `market`, and `valuation` each separate their shared contract from concrete implementations. Consumers should normally use the top-level `tbt_engine` exports; the family packages provide stable domain-level imports when more specific composition is needed. Providers and reusable strategy implementations remain organized in their existing domain packages.
 
 ## Simulation pipeline
 
