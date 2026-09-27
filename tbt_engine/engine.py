@@ -4,9 +4,9 @@ from dataclasses import replace
 from datetime import date
 from enum import Enum
 
+from tbt_engine.collection import InMemoryResultCollector, ResultCollector
 from tbt_engine.costs import (
     CostedFill,
-    ExecutionCost,
     TransactionCostModel,
     ZeroTransactionCostModel,
 )
@@ -40,7 +40,7 @@ from tbt_engine.orders import (
 )
 from tbt_engine.portfolio import Portfolio, PortfolioState
 from tbt_engine.providers.provider import Provider
-from tbt_engine.result import BacktestResult, EquityPoint, Trade
+from tbt_engine.result import BacktestResult
 from tbt_engine.strategy import Strategy
 from tbt_engine.valuation import (
     ClosePriceValuationModel,
@@ -74,6 +74,7 @@ class Engine:
         transaction_cost_model: TransactionCostModel | None = None,
         portfolio_currency: str = "USD",
         valuation_model: ValuationModel | None = None,
+        result_collector: ResultCollector | None = None,
     ):
         if provider is None:
             from tbt_engine.providers.yahoo_provider import YahooProvider
@@ -99,6 +100,9 @@ class Engine:
         self.valuation_model = (
             ClosePriceValuationModel() if valuation_model is None else valuation_model
         )
+        self.result_collector = (
+            InMemoryResultCollector() if result_collector is None else result_collector
+        )
 
     def start(self, strategy: Strategy) -> BacktestResult:
         logger.info("Running strategy: %s", strategy.name)
@@ -116,15 +120,13 @@ class Engine:
         )
         market.set_assets(strategy.define_market())
 
-        trades: list[Trade] = []
-        equity_history: list[EquityPoint] = []
-        valuations: list[PortfolioValuation] = []
-        fills: list[Fill] = []
-        execution_costs: list[ExecutionCost] = []
+        collector = self.result_collector
+        collector.begin(self.initial_balance)
+        collector.collect(portfolio.ledger.entries[0])
         orders: dict[OrderId, Order] = {}
-        order_events: list[OrderEvent] = []
         next_order_id = 1
         next_fill_id = 1
+        final_time: str | None = None
 
         while market.next_candle() < market.final_candle:
             before_open = BeforeOpenMarketState(market)
@@ -136,7 +138,7 @@ class Engine:
                     orders=OrderState(orders),
                 ),
                 orders,
-                order_events,
+                collector,
                 market,
                 candle_time,
                 SimulationPhase.BEFORE_OPEN,
@@ -145,10 +147,7 @@ class Engine:
 
             next_fill_id = self._execute_orders(
                 orders,
-                order_events,
-                trades,
-                fills,
-                execution_costs,
+                collector,
                 portfolio,
                 market,
                 candle_time,
@@ -165,7 +164,7 @@ class Engine:
                     orders=OrderState(orders),
                 ),
                 orders,
-                order_events,
+                collector,
                 market,
                 candle_time,
                 SimulationPhase.ACTIVE,
@@ -174,10 +173,7 @@ class Engine:
 
             next_fill_id = self._execute_orders(
                 orders,
-                order_events,
-                trades,
-                fills,
-                execution_costs,
+                collector,
                 portfolio,
                 market,
                 candle_time,
@@ -194,7 +190,7 @@ class Engine:
                     orders=OrderState(orders),
                 ),
                 orders,
-                order_events,
+                collector,
                 market,
                 candle_time,
                 SimulationPhase.AFTER_CLOSE,
@@ -215,14 +211,17 @@ class Engine:
                 portfolio.ledger.state,
                 valuation_market,
             )
-            valuations.append(valuation)
-            equity_history.append(EquityPoint(candle_time, valuation.total_equity))
+            collector.collect(valuation)
+            final_time = valuation.time
 
-        final_time = equity_history[-1].time
+        if final_time is None:
+            raise RuntimeError("Simulation produced no valuation events")
         for order_id, order in tuple(orders.items()):
             if order.status in {OrderStatus.PENDING, OrderStatus.PARTIALLY_FILLED}:
-                orders[order_id] = replace(order, status=OrderStatus.EXPIRED)
-                order_events.append(
+                expired_order = replace(order, status=OrderStatus.EXPIRED)
+                orders[order_id] = expired_order
+                collector.collect(expired_order)
+                collector.collect(
                     OrderEvent(
                         order_id=order_id,
                         time=final_time,
@@ -232,18 +231,7 @@ class Engine:
                     )
                 )
 
-        result = BacktestResult(
-            starting_equity=self.initial_balance,
-            ending_equity=equity_history[-1].equity,
-            trades=trades,
-            equity_history=equity_history,
-            orders=list(orders.values()),
-            order_events=order_events,
-            fills=fills,
-            execution_costs=execution_costs,
-            ledger_entries=list(portfolio.ledger.entries),
-            valuations=valuations,
-        )
+        result = collector.finalize()
         logger.info(
             "Finished %s: equity=%.2f return=%.2f%% trades=%d",
             strategy.name,
@@ -257,7 +245,7 @@ class Engine:
     def _process_commands(
         commands: list[StrategyCommand],
         orders: dict[OrderId, Order],
-        events: list[OrderEvent],
+        collector: ResultCollector,
         market: Market,
         time: str,
         phase: SimulationPhase,
@@ -287,7 +275,7 @@ class Engine:
                     eligible_candle += 1
 
                 status = OrderStatus.REJECTED if reason is not None else OrderStatus.PENDING
-                orders[order_id] = Order(
+                submitted_order = Order(
                     id=order_id,
                     intent=intent,
                     status=status,
@@ -295,7 +283,9 @@ class Engine:
                     submitted_phase=phase.value,
                     eligible_candle=eligible_candle,
                 )
-                events.append(
+                orders[order_id] = submitted_order
+                collector.collect(submitted_order)
+                collector.collect(
                     OrderEvent(
                         order_id=order_id,
                         time=time,
@@ -315,13 +305,15 @@ class Engine:
                 OrderStatus.PENDING,
                 OrderStatus.PARTIALLY_FILLED,
             }:
-                orders[command.order_id] = replace(order, status=OrderStatus.CANCELLED)
+                cancelled_order = replace(order, status=OrderStatus.CANCELLED)
+                orders[command.order_id] = cancelled_order
+                collector.collect(cancelled_order)
                 event_type = OrderEventType.CANCELLED
                 reason = None
             else:
                 event_type = OrderEventType.CANCELLATION_REJECTED
                 reason = "Order is unknown or no longer cancellable"
-            events.append(
+            collector.collect(
                 OrderEvent(
                     order_id=command.order_id,
                     time=time,
@@ -335,10 +327,7 @@ class Engine:
     def _execute_orders(
         self,
         orders: dict[OrderId, Order],
-        events: list[OrderEvent],
-        trades: list[Trade],
-        fills: list[Fill],
-        execution_costs: list[ExecutionCost],
+        collector: ResultCollector,
         portfolio: Portfolio,
         market: Market,
         time: str,
@@ -375,7 +364,7 @@ class Engine:
             self._validate_execution_outcome(order, outcome, execution_market)
 
             if outcome.status is ExecutionOutcomeStatus.NO_FILL:
-                events.append(
+                collector.collect(
                     OrderEvent(
                         order_id=order_id,
                         time=time,
@@ -387,8 +376,10 @@ class Engine:
                 continue
 
             if outcome.status is ExecutionOutcomeStatus.REJECTED:
-                orders[order_id] = replace(order, status=OrderStatus.REJECTED)
-                events.append(
+                rejected_order = replace(order, status=OrderStatus.REJECTED)
+                orders[order_id] = rejected_order
+                collector.collect(rejected_order)
+                collector.collect(
                     OrderEvent(
                         order_id=order_id,
                         time=time,
@@ -413,8 +404,10 @@ class Engine:
 
             posting = portfolio.post(costed_fills)
             if not posting.accepted:
-                orders[order_id] = replace(order, status=OrderStatus.REJECTED)
-                events.append(
+                rejected_order = replace(order, status=OrderStatus.REJECTED)
+                orders[order_id] = rejected_order
+                collector.collect(rejected_order)
+                collector.collect(
                     OrderEvent(
                         order_id=order_id,
                         time=time,
@@ -427,19 +420,10 @@ class Engine:
 
             for costed_fill in costed_fills:
                 fill = costed_fill.fill
-                fills.append(fill)
-                execution_costs.append(costed_fill.cost)
-                trades.append(
-                    Trade(
-                        time=fill.time,
-                        symbol=fill.symbol,
-                        side=fill.side.value,
-                        quantity=fill.quantity,
-                        price=fill.price,
-                        order_id=fill.order_id,
-                        phase=fill.phase.value,
-                    )
-                )
+                collector.collect(fill)
+                collector.collect(costed_fill.cost)
+            for entry in posting.entries:
+                collector.collect(entry)
             next_fill_id += len(costed_fills)
 
             order_status = (
@@ -447,12 +431,14 @@ class Engine:
                 if outcome.status is ExecutionOutcomeStatus.FILLED
                 else OrderStatus.PARTIALLY_FILLED
             )
-            orders[order_id] = replace(
+            updated_order = replace(
                 order,
                 status=order_status,
                 filled_quantity=order.intent.quantity - outcome.remaining_quantity,
             )
-            events.append(
+            orders[order_id] = updated_order
+            collector.collect(updated_order)
+            collector.collect(
                 OrderEvent(
                     order_id=order_id,
                     time=time,

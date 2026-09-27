@@ -97,6 +97,12 @@ The ledger validates the complete execution batch before committing it, so insuf
 
 Each immutable `PortfolioValuation` records its time, phase, model, currency, cash, position quantities, prices, market values, and reconciled total equity. These records are returned through `BacktestResult.valuations`; the existing equity history and ending equity retain their previous values under the default model.
 
+## Result collection
+
+Simulation output is observed through a replaceable `ResultCollector` supplied with `Engine(result_collector=...)`. The collector receives immutable order snapshots and lifecycle events, fills, execution costs, ledger entries, and valuations in deterministic simulation order. It cannot change the records or participate in strategy, execution, accounting, or valuation decisions.
+
+The default `InMemoryResultCollector` produces the existing `BacktestResult`. Compatibility trades are derived from authoritative fills, while equity history and ending equity are derived from authoritative valuation records instead of being maintained as separate engine state. A collector is reset at the beginning of every run and finalized once after all end-of-data order events have been observed.
+
 ## Run the example
 
 ```bash
