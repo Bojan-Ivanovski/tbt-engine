@@ -1,5 +1,4 @@
 import logging
-from datetime import date
 
 from tbt_engine.core.collection import InMemoryResultCollector, ResultCollector
 from tbt_engine.core.costs import TransactionCostModel, ZeroTransactionCostModel
@@ -18,10 +17,8 @@ logger = logging.getLogger(__name__)
 class Engine:
     def __init__(
         self,
+        market: Market | None = None,
         provider: Provider | None = None,
-        start_date: date = date(2000, 1, 1),
-        end_date: date | None = None,
-        interval: str = "1d",
         initial_portfolio: InitialPortfolio | None = None,
         execution_model: ExecutionModel | None = None,
         transaction_cost_model: TransactionCostModel | None = None,
@@ -34,9 +31,8 @@ class Engine:
             provider = YahooProvider()
 
         self.provider = provider
-        self.start_date = start_date
-        self.end_date = end_date
-        self.interval = interval
+        self.market = Market() if market is None else market
+        self.market.set_provider(provider)
         self.initial_portfolio = (
             InitialPortfolio() if initial_portfolio is None else initial_portfolio
         )
@@ -60,16 +56,10 @@ class Engine:
         self._validate_cost_model_capabilities()
         portfolio = Portfolio(
             self.initial_portfolio,
-            opened_at=self.start_date.isoformat(),
-        )
-        market = Market(
-            provider=self.provider,
-            start=self.start_date,
-            end=self.end_date,
-            interval=self.interval,
+            opened_at=self.market.start.isoformat(),
         )
         strategy_assets = strategy.define_assets()
-        market.set_assets(
+        self.market.set_assets(
             [
                 *strategy_assets,
                 *(position.symbol for position in self.initial_portfolio.positions),
@@ -84,7 +74,7 @@ class Engine:
 
         result = pipeline.run(
             strategy,
-            market,
+            self.market,
             portfolio,
             strategy_assets=strategy_assets,
         )

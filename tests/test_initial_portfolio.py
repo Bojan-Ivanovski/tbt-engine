@@ -6,6 +6,7 @@ from tbt_engine import (
     InitialPortfolio,
     InitialPosition,
     LedgerEntryType,
+    Market,
     OrderIntent,
     OrderState,
     OrderStatus,
@@ -133,6 +134,7 @@ class InitialPortfolioTests(unittest.TestCase):
 
         provider = InMemoryProvider()
         result = Engine(
+            market=Market(),
             provider=provider,
             initial_portfolio=initial,
         ).start(strategy)
@@ -152,6 +154,7 @@ class InitialPortfolioTests(unittest.TestCase):
 
     def test_strategy_cannot_trade_an_unselected_portfolio_asset(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(
                 cash=100,
@@ -166,6 +169,7 @@ class InitialPortfolioTests(unittest.TestCase):
 
     def test_engine_recreates_initial_state_for_each_run(self) -> None:
         engine = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(
                 cash=100,

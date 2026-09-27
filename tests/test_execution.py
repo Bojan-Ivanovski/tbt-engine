@@ -11,6 +11,7 @@ from tbt_engine import (
     ExecutionPhase,
     Fill,
     InitialPortfolio,
+    Market,
     Order,
     OrderEventType,
     OrderId,
@@ -167,6 +168,7 @@ class ExecutionModelTests(unittest.TestCase):
 
     def test_partial_fills_are_applied_across_eligible_events(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             execution_model=PartialExecutionModel(),
@@ -187,6 +189,7 @@ class ExecutionModelTests(unittest.TestCase):
 
     def test_one_execution_outcome_can_contain_multiple_fills(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             execution_model=MultipleFillExecutionModel(),
@@ -198,6 +201,7 @@ class ExecutionModelTests(unittest.TestCase):
 
     def test_partially_filled_order_can_be_cancelled_before_next_attempt(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             execution_model=PartialExecutionModel(),
@@ -217,6 +221,7 @@ class ExecutionModelTests(unittest.TestCase):
 
     def test_no_fill_outcome_leaves_order_active_until_expiry(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             execution_model=NoFillExecutionModel(),
@@ -236,6 +241,7 @@ class ExecutionModelTests(unittest.TestCase):
 
     def test_rejected_outcome_terminates_order_without_a_fill(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             execution_model=RejectedExecutionModel(),
@@ -247,6 +253,7 @@ class ExecutionModelTests(unittest.TestCase):
 
     def test_engine_rejects_an_execution_model_that_overfills(self) -> None:
         engine = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             execution_model=OverfillExecutionModel(),

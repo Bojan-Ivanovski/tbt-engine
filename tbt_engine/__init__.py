@@ -35,6 +35,7 @@ from tbt_engine.core.ledger import (
 from tbt_engine.core.market import (
     BeforeOpenMarketState,
     ClosedMarketState,
+    Market,
     MarketState,
     OpenMarketState,
 )
@@ -95,6 +96,7 @@ __all__ = [
     "LedgerEntryType",
     "LedgerPosting",
     "LedgerState",
+    "Market",
     "MarketState",
     "MarketDataCapability",
     "OpenMarketState",

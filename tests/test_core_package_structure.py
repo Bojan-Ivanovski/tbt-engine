@@ -6,6 +6,7 @@ from tbt_engine import (
     ClosePriceValuationModel,
     DailyBarExecutionModel,
     InMemoryResultCollector,
+    Market,
     OpenMarketState,
     StandardTransactionCostModel,
     ZeroTransactionCostModel,
@@ -28,6 +29,7 @@ from tbt_engine.core.market.before_open_market_state import (
 from tbt_engine.core.market.closed_market_state import (
     ClosedMarketState as ConcreteClosedMarketState,
 )
+from tbt_engine.core.market.market import Market as ConcreteMarket
 from tbt_engine.core.market.open_market_state import OpenMarketState as ConcreteOpenMarketState
 from tbt_engine.core.valuation.close_price_valuation_model import (
     ClosePriceValuationModel as ConcreteClosePriceValuationModel,
@@ -44,6 +46,7 @@ class CorePackageStructureTests(unittest.TestCase):
         )
         self.assertIs(ZeroTransactionCostModel, ConcreteZeroTransactionCostModel)
         self.assertIs(ClosePriceValuationModel, ConcreteClosePriceValuationModel)
+        self.assertIs(Market, ConcreteMarket)
         self.assertIs(BeforeOpenMarketState, ConcreteBeforeOpenMarketState)
         self.assertIs(OpenMarketState, ConcreteOpenMarketState)
         self.assertIs(ClosedMarketState, ConcreteClosedMarketState)

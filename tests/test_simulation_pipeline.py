@@ -38,6 +38,7 @@ from tbt_engine.engine import Engine as RootEngine
 class InMemoryProvider(Provider):
     def __init__(self, rows: int = 3) -> None:
         self.requested_symbols: list[str] = []
+        self.requests: list[tuple[str, str, date | None, date | None]] = []
         self._history = pd.DataFrame(
             {"Open": [10.0, 20.0, 30.0], "Close": [12.0, 21.0, 29.0]},
             index=pd.to_datetime(["2026-01-05", "2026-01-06", "2026-01-07"]),
@@ -51,6 +52,7 @@ class InMemoryProvider(Provider):
         end: date | None = None,
     ) -> pd.DataFrame:
         self.requested_symbols.append(symbol)
+        self.requests.append((symbol, interval, start, end))
         return self._history.copy()
 
 
@@ -154,13 +156,47 @@ class SimulationPipelineTests(unittest.TestCase):
         self.assertIs(Engine, RootEngine)
         self.assertIs(SimulationPipeline, CoreSimulationPipeline)
 
+    def test_engine_injects_provider_into_configured_market(self) -> None:
+        provider = InMemoryProvider()
+        market = Market(
+            start=date(2026, 1, 1),
+            end=date(2026, 2, 1),
+            interval="1wk",
+        )
+
+        Engine(
+            market=market,
+            provider=provider,
+            initial_portfolio=InitialPortfolio(cash=100),
+        ).start(NextOpenStrategy())
+
+        self.assertEqual(
+            provider.requests,
+            [("TEST", "1wk", date(2026, 1, 1), date(2026, 2, 1))],
+        )
+
+    def test_engine_creates_default_market_when_none_is_supplied(self) -> None:
+        engine = Engine(provider=InMemoryProvider())
+
+        self.assertIsInstance(engine.market, Market)
+        self.assertEqual(engine.market.start, date(2000, 1, 1))
+        self.assertIsNone(engine.market.end)
+        self.assertEqual(engine.market.interval, "1d")
+
+    def test_market_requires_provider_before_loading_assets(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "provider"):
+            Market().set_assets(["TEST"])
+
     def test_direct_pipeline_run_matches_engine_result(self) -> None:
         engine_strategy = NextOpenStrategy()
         pipeline_strategy = NextOpenStrategy()
         expected = Engine(
-            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+            market=Market(),
+            provider=InMemoryProvider(),
+            initial_portfolio=InitialPortfolio(cash=100),
         ).start(engine_strategy)
-        market = Market(provider=InMemoryProvider(), start=date(2000, 1, 1))
+        market = Market(start=date(2000, 1, 1))
+        market.set_provider(InMemoryProvider())
         market.set_assets(pipeline_strategy.define_assets())
         portfolio = Portfolio(
             InitialPortfolio(cash=100),
@@ -187,7 +223,9 @@ class SimulationPipelineTests(unittest.TestCase):
         strategy = NextOpenStrategy()
 
         result = Engine(
-            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+            market=Market(),
+            provider=InMemoryProvider(),
+            initial_portfolio=InitialPortfolio(cash=100),
         ).start(strategy)
 
         self.assertEqual(result.trades[0].time, "2026-01-06T00:00:00Z")
@@ -208,7 +246,9 @@ class SimulationPipelineTests(unittest.TestCase):
 
     def test_before_open_can_cancel_order_before_opening_fill(self) -> None:
         result = Engine(
-            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+            market=Market(),
+            provider=InMemoryProvider(),
+            initial_portfolio=InitialPortfolio(cash=100),
         ).start(CancelBeforeOpenStrategy())
 
         self.assertEqual(result.trades, [])
@@ -222,7 +262,9 @@ class SimulationPipelineTests(unittest.TestCase):
         strategy = SessionCloseStrategy()
 
         result = Engine(
-            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+            market=Market(),
+            provider=InMemoryProvider(),
+            initial_portfolio=InitialPortfolio(cash=100),
         ).start(strategy)
 
         self.assertEqual(strategy.first_open, 10)
@@ -232,7 +274,9 @@ class SimulationPipelineTests(unittest.TestCase):
 
     def test_order_without_later_open_expires(self) -> None:
         result = Engine(
-            provider=InMemoryProvider(rows=1), initial_portfolio=InitialPortfolio(cash=100)
+            market=Market(),
+            provider=InMemoryProvider(rows=1),
+            initial_portfolio=InitialPortfolio(cash=100),
         ).start(NextOpenStrategy())
 
         self.assertEqual(result.trades, [])

@@ -6,6 +6,7 @@ from tbt_engine import (
     InitialPortfolio,
     InMemoryResultCollector,
     LedgerEntry,
+    Market,
     OrderEventType,
     SimulationRecord,
 )
@@ -29,7 +30,9 @@ class RecordingResultCollector(InMemoryResultCollector):
 class ResultCollectionTests(unittest.TestCase):
     def test_default_collector_derives_trades_from_fills(self) -> None:
         result = Engine(
-            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+            market=Market(),
+            provider=InMemoryProvider(),
+            initial_portfolio=InitialPortfolio(cash=100),
         ).start(NextOpenStrategy())
 
         self.assertEqual(len(result.trades), len(result.fills))
@@ -42,7 +45,9 @@ class ResultCollectionTests(unittest.TestCase):
 
     def test_default_collector_derives_equity_history_from_valuations(self) -> None:
         result = Engine(
-            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+            market=Market(),
+            provider=InMemoryProvider(),
+            initial_portfolio=InitialPortfolio(cash=100),
         ).start(NextOpenStrategy())
 
         self.assertEqual(
@@ -58,6 +63,7 @@ class ResultCollectionTests(unittest.TestCase):
         collector = RecordingResultCollector()
 
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             result_collector=collector,
@@ -86,6 +92,7 @@ class ResultCollectionTests(unittest.TestCase):
     def test_collector_resets_cleanly_for_each_run(self) -> None:
         collector = RecordingResultCollector()
         engine = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             result_collector=collector,

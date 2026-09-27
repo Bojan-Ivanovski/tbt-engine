@@ -5,6 +5,7 @@ from tbt_engine import (
     Engine,
     InitialPortfolio,
     LedgerState,
+    Market,
     PortfolioValuation,
     PositionValuation,
     ValuationMarketState,
@@ -134,7 +135,9 @@ class ValuationModelTests(unittest.TestCase):
 class EngineValuationTests(unittest.TestCase):
     def test_default_valuations_preserve_equity_history(self) -> None:
         result = Engine(
-            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+            market=Market(),
+            provider=InMemoryProvider(),
+            initial_portfolio=InitialPortfolio(cash=100),
         ).start(NextOpenStrategy())
 
         self.assertEqual(len(result.valuations), 3)
@@ -147,6 +150,7 @@ class EngineValuationTests(unittest.TestCase):
 
     def test_custom_valuation_model_is_injected(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             valuation_model=DoublePriceValuationModel(),
@@ -160,6 +164,7 @@ class EngineValuationTests(unittest.TestCase):
         model = CapturingValuationModel()
 
         Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             valuation_model=model,
@@ -176,6 +181,7 @@ class EngineValuationTests(unittest.TestCase):
 
     def test_engine_rejects_a_valuation_with_wrong_positions(self) -> None:
         engine = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             valuation_model=InvalidPositionValuationModel(),

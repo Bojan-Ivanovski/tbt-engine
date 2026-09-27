@@ -36,7 +36,7 @@ python -m build
 The supported API is exported directly from `tbt_engine`:
 
 ```python
-from tbt_engine import Engine, Strategy
+from tbt_engine import Engine, Market, Strategy
 ```
 
 Market-data providers, phase-specific market snapshots, orders, portfolio snapshots, result types, and assets are also available from the top-level package. To use another market data source, implement `Provider.get_history()` and pass the provider to `Engine`. Price history must contain `Open` and `Close` columns.
@@ -44,9 +44,10 @@ Market-data providers, phase-specific market snapshots, orders, portfolio snapsh
 The starting state is supplied as one immutable portfolio definition:
 
 ```python
-from tbt_engine import Engine, InitialPortfolio, InitialPosition
+from tbt_engine import Engine, InitialPortfolio, InitialPosition, Market
 
 engine = Engine(
+    market=Market(),
     initial_portfolio=InitialPortfolio(
         cash=10_000,
         currency="USD",
@@ -55,7 +56,7 @@ engine = Engine(
 )
 ```
 
-The Market registers the union of `Strategy.define_assets()` and initial-position symbols. Strategy snapshots, order validation, and execution are restricted to the strategy-defined subset, while complete registered data remains available for portfolio valuation. Initial quantities enter the ledger as opening state rather than simulated trades, and their first available opening prices establish starting equity before any strategy command or execution event.
+`Market` owns the simulation window and interval. `Engine` supplies its provider to the configured market before loading the union of `Strategy.define_assets()` and initial-position symbols. Strategy snapshots, order validation, and execution are restricted to the strategy-defined subset, while complete registered data remains available for portfolio valuation. Initial quantities enter the ledger as opening state rather than simulated trades, and their first available opening prices establish starting equity before any strategy command or execution event.
 
 The public `Engine` setup facade lives at `tbt_engine.engine`, while simulation-domain implementation lives under `tbt_engine.core`. Extensible families are organized as packages: `collection`, `costs`, `execution`, `market`, and `valuation` each separate their shared contract from concrete implementations. Consumers should normally use the top-level `tbt_engine` exports; the family packages provide stable domain-level imports when more specific composition is needed. Providers and reusable strategy implementations remain organized in their existing domain packages.
 
@@ -90,9 +91,10 @@ Custom models can be passed to `Engine(execution_model=...)`. Pending partial qu
 The engine uses `ZeroTransactionCostModel` by default, preserving the fill prices and accounting behavior of a backtest with no transaction costs. A deterministic standard model can be injected directly:
 
 ```python
-from tbt_engine import Engine, StandardTransactionCostModel
+from tbt_engine import Engine, Market, StandardTransactionCostModel
 
 engine = Engine(
+    market=Market(),
     transaction_cost_model=StandardTransactionCostModel(
         commission_per_order=1.00,
         commission_per_unit=0.005,
