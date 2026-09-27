@@ -10,6 +10,7 @@ from tbt_engine import (
     ExecutionOutcomeStatus,
     ExecutionPhase,
     Fill,
+    InitialPortfolio,
     Order,
     OrderEventType,
     OrderId,
@@ -141,7 +142,7 @@ class CancelAfterPartialStrategy(NextOpenStrategy):
 
 class ExecutionModelTests(unittest.TestCase):
     def test_daily_bar_model_returns_fill_without_mutating_portfolio(self) -> None:
-        portfolio = Portfolio(initial_balance=100)
+        portfolio = Portfolio(initial_portfolio=InitialPortfolio(cash=100))
         order = Order(
             id=OrderId(1),
             intent=OrderIntent(symbol="TEST", side=Side.BUY, quantity=2),
@@ -167,7 +168,7 @@ class ExecutionModelTests(unittest.TestCase):
     def test_partial_fills_are_applied_across_eligible_events(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             execution_model=PartialExecutionModel(),
         ).start(NextOpenStrategy())
 
@@ -187,7 +188,7 @@ class ExecutionModelTests(unittest.TestCase):
     def test_one_execution_outcome_can_contain_multiple_fills(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             execution_model=MultipleFillExecutionModel(),
         ).start(NextOpenStrategy())
 
@@ -198,7 +199,7 @@ class ExecutionModelTests(unittest.TestCase):
     def test_partially_filled_order_can_be_cancelled_before_next_attempt(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             execution_model=PartialExecutionModel(),
         ).start(CancelAfterPartialStrategy())
 
@@ -217,7 +218,7 @@ class ExecutionModelTests(unittest.TestCase):
     def test_no_fill_outcome_leaves_order_active_until_expiry(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             execution_model=NoFillExecutionModel(),
         ).start(NextOpenStrategy())
 
@@ -236,7 +237,7 @@ class ExecutionModelTests(unittest.TestCase):
     def test_rejected_outcome_terminates_order_without_a_fill(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             execution_model=RejectedExecutionModel(),
         ).start(NextOpenStrategy())
 
@@ -247,7 +248,7 @@ class ExecutionModelTests(unittest.TestCase):
     def test_engine_rejects_an_execution_model_that_overfills(self) -> None:
         engine = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             execution_model=OverfillExecutionModel(),
         )
 

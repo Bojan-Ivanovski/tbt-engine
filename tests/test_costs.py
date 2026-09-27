@@ -7,6 +7,7 @@ from tbt_engine import (
     ExecutionPhase,
     Fill,
     FillId,
+    InitialPortfolio,
     MarketDataCapability,
     OrderId,
     Side,
@@ -119,7 +120,7 @@ class EngineTransactionCostTests(unittest.TestCase):
     def test_engine_applies_costs_and_exposes_linked_records(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             transaction_cost_model=StandardTransactionCostModel(
                 commission_per_order=1,
                 spread_bps=100,
@@ -135,7 +136,9 @@ class EngineTransactionCostTests(unittest.TestCase):
         self.assertAlmostEqual(result.ending_equity, 116.6)
 
     def test_default_engine_behavior_has_explicit_zero_costs(self) -> None:
-        result = Engine(provider=InMemoryProvider(), initial_balance=100).start(NextOpenStrategy())
+        result = Engine(
+            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+        ).start(NextOpenStrategy())
 
         self.assertEqual(len(result.execution_costs), 1)
         self.assertEqual(result.execution_costs[0].total_cost, 0)
@@ -163,7 +166,7 @@ class EngineTransactionCostTests(unittest.TestCase):
     def test_direct_costs_are_included_in_buy_affordability(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=40,
+            initial_portfolio=InitialPortfolio(cash=40),
             transaction_cost_model=StandardTransactionCostModel(commission_per_order=1),
         ).start(NextOpenStrategy())
 
@@ -174,7 +177,7 @@ class EngineTransactionCostTests(unittest.TestCase):
     def test_partial_fills_only_charge_per_order_commission_once(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             execution_model=PartialExecutionModel(),
             transaction_cost_model=StandardTransactionCostModel(commission_per_order=1),
         ).start(NextOpenStrategy())

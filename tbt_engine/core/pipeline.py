@@ -1,6 +1,7 @@
 import math
 from dataclasses import replace
 from enum import Enum
+from typing import Iterable
 
 from tbt_engine.core.collection import ResultCollector
 from tbt_engine.core.costs import CostedFill, TransactionCostModel
@@ -72,18 +73,25 @@ class SimulationPipeline:
         strategy: Strategy,
         market: Market,
         portfolio: Portfolio,
+        *,
+        strategy_assets: Iterable[str],
     ) -> BacktestResult:
+        strategy_symbols = frozenset(symbol.upper() for symbol in strategy_assets)
+        missing_symbols = strategy_symbols.difference(market.assets)
+        if missing_symbols:
+            missing = ", ".join(sorted(missing_symbols))
+            raise ValueError(f"Strategy assets are not registered in the market: {missing}")
         collector = self.result_collector
-        opening_entry = portfolio.ledger.entries[0]
-        collector.begin(opening_entry.cash_delta)
-        collector.collect(opening_entry)
+        collector.begin(self._calculate_starting_equity(portfolio, market))
+        for opening_entry in portfolio.ledger.entries:
+            collector.collect(opening_entry)
         orders: dict[OrderId, Order] = {}
         next_order_id = 1
         next_fill_id = 1
         final_time: str | None = None
 
         while market.next_candle() < market.final_candle:
-            before_open = BeforeOpenMarketState(market)
+            before_open = BeforeOpenMarketState(market, strategy_symbols)
             candle_time = before_open.get_market_time_iso()
             next_order_id = self._process_commands(
                 strategy.before_open(
@@ -93,6 +101,7 @@ class SimulationPipeline:
                 ),
                 orders,
                 market,
+                strategy_symbols,
                 candle_time,
                 SimulationPhase.BEFORE_OPEN,
                 next_order_id,
@@ -102,13 +111,14 @@ class SimulationPipeline:
                 orders,
                 portfolio,
                 market,
+                strategy_symbols,
                 candle_time,
                 SimulationPhase.OPEN,
                 ExecutionTime.NEXT_OPEN,
                 next_fill_id,
             )
 
-            open_state = OpenMarketState(market)
+            open_state = OpenMarketState(market, strategy_symbols)
             next_order_id = self._process_commands(
                 strategy.execute(
                     market=open_state,
@@ -117,6 +127,7 @@ class SimulationPipeline:
                 ),
                 orders,
                 market,
+                strategy_symbols,
                 candle_time,
                 SimulationPhase.ACTIVE,
                 next_order_id,
@@ -126,13 +137,14 @@ class SimulationPipeline:
                 orders,
                 portfolio,
                 market,
+                strategy_symbols,
                 candle_time,
                 SimulationPhase.CLOSE,
                 ExecutionTime.SESSION_CLOSE,
                 next_fill_id,
             )
 
-            closed_state = ClosedMarketState(market)
+            closed_state = ClosedMarketState(market, strategy_symbols)
             next_order_id = self._process_commands(
                 strategy.after_close(
                     market=closed_state,
@@ -141,6 +153,7 @@ class SimulationPipeline:
                 ),
                 orders,
                 market,
+                strategy_symbols,
                 candle_time,
                 SimulationPhase.AFTER_CLOSE,
                 next_order_id,
@@ -149,7 +162,10 @@ class SimulationPipeline:
             valuation_market = ValuationMarketState(
                 time=candle_time,
                 phase=ValuationPhase.CLOSE,
-                prices={symbol: closed_state.get_latest_closed(symbol) for symbol in market.assets},
+                prices={
+                    symbol: asset.get_close(market.current_candle)
+                    for symbol, asset in market.assets.items()
+                },
             )
             valuation = self.valuation_model.value(
                 portfolio.ledger.state,
@@ -182,11 +198,23 @@ class SimulationPipeline:
 
         return collector.finalize()
 
+    @staticmethod
+    def _calculate_starting_equity(portfolio: Portfolio, market: Market) -> float:
+        state = portfolio.ledger.state
+        starting_equity = state.cash
+        for symbol, quantity in state.positions:
+            asset = market.assets.get(symbol)
+            if asset is None:
+                raise ValueError(f"No opening price available for initial position {symbol}")
+            starting_equity += quantity * asset.get_open(0)
+        return starting_equity
+
     def _process_commands(
         self,
         commands: list[StrategyCommand],
         orders: dict[OrderId, Order],
         market: Market,
+        strategy_symbols: frozenset[str],
         time: str,
         phase: SimulationPhase,
         next_order_id: int,
@@ -197,8 +225,8 @@ class SimulationPipeline:
                 next_order_id += 1
                 intent = command.intent
                 reason: str | None = None
-                if intent.symbol not in market.assets:
-                    reason = f"Unknown market symbol: {intent.symbol}"
+                if intent.symbol not in strategy_symbols:
+                    reason = f"Symbol is outside the strategy asset set: {intent.symbol}"
                 elif not math.isfinite(intent.quantity) or intent.quantity <= 0:
                     reason = "Order quantity must be finite and greater than zero"
                 elif (
@@ -269,6 +297,7 @@ class SimulationPipeline:
         orders: dict[OrderId, Order],
         portfolio: Portfolio,
         market: Market,
+        strategy_symbols: frozenset[str],
         time: str,
         phase: SimulationPhase,
         execution_time: ExecutionTime,
@@ -289,6 +318,7 @@ class SimulationPipeline:
                     else asset.get_close(market.current_candle)
                 )
                 for symbol, asset in market.assets.items()
+                if symbol in strategy_symbols
             },
         )
         for order_id, order in tuple(orders.items()):

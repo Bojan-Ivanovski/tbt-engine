@@ -3,6 +3,7 @@ import unittest
 from tbt_engine import (
     Engine,
     EquityPoint,
+    InitialPortfolio,
     InMemoryResultCollector,
     LedgerEntry,
     OrderEventType,
@@ -27,7 +28,9 @@ class RecordingResultCollector(InMemoryResultCollector):
 
 class ResultCollectionTests(unittest.TestCase):
     def test_default_collector_derives_trades_from_fills(self) -> None:
-        result = Engine(provider=InMemoryProvider(), initial_balance=100).start(NextOpenStrategy())
+        result = Engine(
+            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+        ).start(NextOpenStrategy())
 
         self.assertEqual(len(result.trades), len(result.fills))
         self.assertEqual(result.trades[0].time, result.fills[0].time)
@@ -38,7 +41,9 @@ class ResultCollectionTests(unittest.TestCase):
         self.assertEqual(result.trades[0].order_id, result.fills[0].order_id)
 
     def test_default_collector_derives_equity_history_from_valuations(self) -> None:
-        result = Engine(provider=InMemoryProvider(), initial_balance=100).start(NextOpenStrategy())
+        result = Engine(
+            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+        ).start(NextOpenStrategy())
 
         self.assertEqual(
             result.equity_history,
@@ -54,7 +59,7 @@ class ResultCollectionTests(unittest.TestCase):
 
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             result_collector=collector,
         ).start(NextOpenStrategy())
 
@@ -82,7 +87,7 @@ class ResultCollectionTests(unittest.TestCase):
         collector = RecordingResultCollector()
         engine = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             result_collector=collector,
         )
 

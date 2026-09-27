@@ -9,6 +9,7 @@ from tbt_engine import (
     DailyBarExecutionModel,
     Engine,
     ExecutionTime,
+    InitialPortfolio,
     InMemoryResultCollector,
     OrderEventType,
     OrderIntent,
@@ -36,6 +37,7 @@ from tbt_engine.core.portfolio import Portfolio
 
 class InMemoryProvider(Provider):
     def __init__(self, rows: int = 3) -> None:
+        self.requested_symbols: list[str] = []
         self._history = pd.DataFrame(
             {"Open": [10.0, 20.0, 30.0], "Close": [12.0, 21.0, 29.0]},
             index=pd.to_datetime(["2026-01-05", "2026-01-06", "2026-01-07"]),
@@ -48,6 +50,7 @@ class InMemoryProvider(Provider):
         start: date | None = None,
         end: date | None = None,
     ) -> pd.DataFrame:
+        self.requested_symbols.append(symbol)
         return self._history.copy()
 
 
@@ -57,7 +60,7 @@ class NextOpenStrategy(Strategy):
         self.submitted = False
         self.observations: list[tuple[str, int]] = []
 
-    def define_market(self) -> list[str]:
+    def define_assets(self) -> list[str]:
         return ["TEST"]
 
     def before_open(
@@ -120,7 +123,7 @@ class SessionCloseStrategy(Strategy):
         self.first_open: float | None = None
         self.closed_bars_during_execute: int | None = None
 
-    def define_market(self) -> list[str]:
+    def define_assets(self) -> list[str]:
         return ["TEST"]
 
     def execute(
@@ -154,12 +157,13 @@ class SimulationPipelineTests(unittest.TestCase):
     def test_direct_pipeline_run_matches_engine_result(self) -> None:
         engine_strategy = NextOpenStrategy()
         pipeline_strategy = NextOpenStrategy()
-        expected = Engine(provider=InMemoryProvider(), initial_balance=100).start(engine_strategy)
+        expected = Engine(
+            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+        ).start(engine_strategy)
         market = Market(provider=InMemoryProvider(), start=date(2000, 1, 1))
-        market.set_assets(pipeline_strategy.define_market())
+        market.set_assets(pipeline_strategy.define_assets())
         portfolio = Portfolio(
-            100,
-            currency="USD",
+            InitialPortfolio(cash=100),
             opened_at=date(2000, 1, 1).isoformat(),
         )
         pipeline = SimulationPipeline(
@@ -169,7 +173,12 @@ class SimulationPipelineTests(unittest.TestCase):
             result_collector=InMemoryResultCollector(),
         )
 
-        actual = pipeline.run(pipeline_strategy, market, portfolio)
+        actual = pipeline.run(
+            pipeline_strategy,
+            market,
+            portfolio,
+            strategy_assets=pipeline_strategy.define_assets(),
+        )
 
         self.assertEqual(actual, expected)
         self.assertEqual(pipeline_strategy.observations, engine_strategy.observations)
@@ -177,7 +186,9 @@ class SimulationPipelineTests(unittest.TestCase):
     def test_after_close_order_fills_at_next_open(self) -> None:
         strategy = NextOpenStrategy()
 
-        result = Engine(provider=InMemoryProvider(), initial_balance=100).start(strategy)
+        result = Engine(
+            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+        ).start(strategy)
 
         self.assertEqual(result.trades[0].time, "2026-01-06T00:00:00Z")
         self.assertEqual(result.trades[0].price, 20)
@@ -196,9 +207,9 @@ class SimulationPipelineTests(unittest.TestCase):
         )
 
     def test_before_open_can_cancel_order_before_opening_fill(self) -> None:
-        result = Engine(provider=InMemoryProvider(), initial_balance=100).start(
-            CancelBeforeOpenStrategy()
-        )
+        result = Engine(
+            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+        ).start(CancelBeforeOpenStrategy())
 
         self.assertEqual(result.trades, [])
         self.assertEqual(result.orders[0].status, OrderStatus.CANCELLED)
@@ -210,7 +221,9 @@ class SimulationPipelineTests(unittest.TestCase):
     def test_execute_can_submit_order_for_current_close(self) -> None:
         strategy = SessionCloseStrategy()
 
-        result = Engine(provider=InMemoryProvider(), initial_balance=100).start(strategy)
+        result = Engine(
+            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+        ).start(strategy)
 
         self.assertEqual(strategy.first_open, 10)
         self.assertEqual(strategy.closed_bars_during_execute, 0)
@@ -218,9 +231,9 @@ class SimulationPipelineTests(unittest.TestCase):
         self.assertEqual(result.trades[0].price, 12)
 
     def test_order_without_later_open_expires(self) -> None:
-        result = Engine(provider=InMemoryProvider(rows=1), initial_balance=100).start(
-            NextOpenStrategy()
-        )
+        result = Engine(
+            provider=InMemoryProvider(rows=1), initial_portfolio=InitialPortfolio(cash=100)
+        ).start(NextOpenStrategy())
 
         self.assertEqual(result.trades, [])
         self.assertEqual(result.orders[0].status, OrderStatus.EXPIRED)

@@ -7,6 +7,7 @@ from tbt_engine import (
     ExecutionPhase,
     Fill,
     FillId,
+    InitialPortfolio,
     LedgerEntryId,
     LedgerEntryType,
     OrderId,
@@ -181,7 +182,7 @@ class EngineLedgerTests(unittest.TestCase):
     def test_engine_exposes_reconcilable_ledger_entries(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             transaction_cost_model=StandardTransactionCostModel(
                 commission_per_order=1,
                 fee_rate=0.001,
@@ -204,8 +205,7 @@ class EngineLedgerTests(unittest.TestCase):
     def test_engine_rejects_mismatched_cost_currency(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
-            portfolio_currency="USD",
+            initial_portfolio=InitialPortfolio(cash=100),
             transaction_cost_model=StandardTransactionCostModel(currency="EUR"),
         ).start(NextOpenStrategy())
 
@@ -215,11 +215,10 @@ class EngineLedgerTests(unittest.TestCase):
         self.assertIn("portfolio base currency is USD", result.order_events[-1].reason or "")
         self.assertEqual(len(result.ledger_entries), 1)
 
-    def test_default_zero_cost_model_uses_portfolio_currency(self) -> None:
+    def test_default_zero_cost_model_uses_initial_portfolio_currency(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
-            portfolio_currency="EUR",
+            initial_portfolio=InitialPortfolio(cash=100, currency="EUR"),
         ).start(NextOpenStrategy())
 
         self.assertEqual(result.execution_costs[0].currency, "EUR")
@@ -228,7 +227,7 @@ class EngineLedgerTests(unittest.TestCase):
     def test_multi_fill_outcome_is_rejected_without_partial_posting(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=30,
+            initial_portfolio=InitialPortfolio(cash=30),
             execution_model=MultipleFillExecutionModel(),
         ).start(NextOpenStrategy())
 

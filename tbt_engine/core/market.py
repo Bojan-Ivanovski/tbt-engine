@@ -65,23 +65,27 @@ class Market:
     def set_assets(self, symbols: Iterable[str]) -> None:
         normalized_symbols = sorted(set(symbol.upper() for symbol in symbols))
         if not normalized_symbols:
-            raise ValueError("A strategy must define at least one symbol")
+            raise ValueError("A market must register at least one symbol")
 
-        for symbol in normalized_symbols:
-            history = self.provider.get_history(
-                symbol=symbol,
-                start=self.start,
-                end=self.end,
-                interval=self.interval,
-            )
-            if history.empty:
-                raise ValueError(f"No price history returned for {symbol}")
-            missing_columns = {"Open", "Close"}.difference(history.columns)
-            if missing_columns:
-                missing = ", ".join(sorted(missing_columns))
-                raise ValueError(f"Price history for {symbol} is missing columns: {missing}")
-            self.assets[symbol] = MarketAsset(symbol, history.sort_index())
+        self.assets = {symbol: self._load_asset(symbol) for symbol in normalized_symbols}
+        self._align_assets()
 
+    def _load_asset(self, symbol: str) -> MarketAsset:
+        history = self.provider.get_history(
+            symbol=symbol,
+            start=self.start,
+            end=self.end,
+            interval=self.interval,
+        )
+        if history.empty:
+            raise ValueError(f"No price history returned for {symbol}")
+        missing_columns = {"Open", "Close"}.difference(history.columns)
+        if missing_columns:
+            missing = ", ".join(sorted(missing_columns))
+            raise ValueError(f"Price history for {symbol} is missing columns: {missing}")
+        return MarketAsset(symbol, history.sort_index())
+
+    def _align_assets(self) -> None:
         common_index: pd.Index[Any] | None = None
         for asset in self.assets.values():
             common_index = (
@@ -104,8 +108,19 @@ class Market:
 
 
 class MarketState:
-    def __init__(self, market: Market, last_closed_candle: int | None = None):
-        self._assets = market.assets
+    def __init__(
+        self,
+        market: Market,
+        symbols: Iterable[str],
+        last_closed_candle: int | None = None,
+    ):
+        normalized_symbols = sorted(set(symbol.upper() for symbol in symbols))
+        missing_symbols = set(normalized_symbols).difference(market.assets)
+        if missing_symbols:
+            missing = ", ".join(sorted(missing_symbols))
+            raise ValueError(f"Strategy assets are not registered in the market: {missing}")
+        self._assets = {symbol: market.assets[symbol] for symbol in normalized_symbols}
+        self._time_asset = next(iter(market.assets.values()))
         self._current_candle = market.current_candle
         self._last_closed_candle = (
             market.current_candle if last_closed_candle is None else last_closed_candle
@@ -118,26 +133,25 @@ class MarketState:
         return self._assets[symbol].get_candle_range(self._last_closed_candle).copy()
 
     def get_market_time_iso(self) -> str:
-        first_asset = next(iter(self._assets.values()))
-        return first_asset.get_candle_time_iso(self._current_candle)
+        return self._time_asset.get_candle_time_iso(self._current_candle)
 
 
 class BeforeOpenMarketState(MarketState):
-    def __init__(self, market: Market):
-        super().__init__(market, market.current_candle - 1)
+    def __init__(self, market: Market, symbols: Iterable[str]):
+        super().__init__(market, symbols, market.current_candle - 1)
 
 
 class OpenMarketState(MarketState):
-    def __init__(self, market: Market):
-        super().__init__(market, market.current_candle - 1)
+    def __init__(self, market: Market, symbols: Iterable[str]):
+        super().__init__(market, symbols, market.current_candle - 1)
 
     def get_current_open(self, symbol: str) -> float:
         return self._assets[symbol].get_open(self._current_candle)
 
 
 class ClosedMarketState(MarketState):
-    def __init__(self, market: Market):
-        super().__init__(market, market.current_candle)
+    def __init__(self, market: Market, symbols: Iterable[str]):
+        super().__init__(market, symbols, market.current_candle)
 
     def get_latest_closed(self, symbol: str) -> float:
         return self._assets[symbol].get_close(self._last_closed_candle)
