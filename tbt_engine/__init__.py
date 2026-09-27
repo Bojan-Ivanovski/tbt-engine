@@ -2,6 +2,15 @@
 
 from tbt_engine.asset import Asset
 from tbt_engine.engine import Engine, SimulationPhase
+from tbt_engine.execution import (
+    DailyBarExecutionModel,
+    ExecutionMarketState,
+    ExecutionModel,
+    ExecutionOutcome,
+    ExecutionOutcomeStatus,
+    ExecutionPhase,
+    Fill,
+)
 from tbt_engine.market import (
     BeforeOpenMarketState,
     ClosedMarketState,
@@ -35,9 +44,16 @@ __all__ = [
     "Buy",
     "CancelOrder",
     "ClosedMarketState",
+    "DailyBarExecutionModel",
     "Engine",
     "EquityPoint",
     "ExecutionTime",
+    "ExecutionMarketState",
+    "ExecutionModel",
+    "ExecutionOutcome",
+    "ExecutionOutcomeStatus",
+    "ExecutionPhase",
+    "Fill",
     "MarketState",
     "OpenMarketState",
     "Order",

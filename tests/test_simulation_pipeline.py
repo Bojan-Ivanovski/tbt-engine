@@ -142,6 +142,8 @@ class SimulationPipelineTests(unittest.TestCase):
         self.assertEqual(result.trades[0].time, "2026-01-06T00:00:00Z")
         self.assertEqual(result.trades[0].price, 20)
         self.assertEqual(result.trades[0].quantity, 2)
+        self.assertEqual(result.fills[0].order_id, result.orders[0].id)
+        self.assertEqual(result.fills[0].price, 20)
         self.assertEqual(result.orders[0].status, OrderStatus.FILLED)
         self.assertEqual(
             strategy.observations[:4],
