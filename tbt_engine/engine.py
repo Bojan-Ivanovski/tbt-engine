@@ -34,7 +34,6 @@ from tbt_engine.orders import (
     OrderId,
     OrderState,
     OrderStatus,
-    Side,
     StrategyCommand,
     SubmitOrder,
 )
@@ -65,6 +64,7 @@ class Engine:
         initial_balance: float = 1000.0,
         execution_model: ExecutionModel | None = None,
         transaction_cost_model: TransactionCostModel | None = None,
+        portfolio_currency: str = "USD",
     ):
         if provider is None:
             from tbt_engine.providers.yahoo_provider import YahooProvider
@@ -76,17 +76,26 @@ class Engine:
         self.end_date = end_date
         self.interval = interval
         self.initial_balance = float(initial_balance)
+        self.portfolio_currency = portfolio_currency.strip().upper()
+        if len(self.portfolio_currency) != 3 or not self.portfolio_currency.isalpha():
+            raise ValueError("Portfolio currency must be a three-letter code")
         self.execution_model = (
             DailyBarExecutionModel() if execution_model is None else execution_model
         )
         self.transaction_cost_model = (
-            ZeroTransactionCostModel() if transaction_cost_model is None else transaction_cost_model
+            ZeroTransactionCostModel(currency=self.portfolio_currency)
+            if transaction_cost_model is None
+            else transaction_cost_model
         )
 
     def start(self, strategy: Strategy) -> BacktestResult:
         logger.info("Running strategy: %s", strategy.name)
         self._validate_cost_model_capabilities()
-        portfolio = Portfolio(self.initial_balance)
+        portfolio = Portfolio(
+            self.initial_balance,
+            currency=self.portfolio_currency,
+            opened_at=self.start_date.isoformat(),
+        )
         market = Market(
             provider=self.provider,
             start=self.start_date,
@@ -208,6 +217,7 @@ class Engine:
             order_events=order_events,
             fills=fills,
             execution_costs=execution_costs,
+            ledger_entries=list(portfolio.ledger.entries),
         )
         logger.info(
             "Finished %s: equity=%.2f return=%.2f%% trades=%d",
@@ -376,33 +386,22 @@ class Engine:
                 expected_fill = replace(outcome.fills[index], id=FillId(next_fill_id + index))
                 self._validate_costed_fill(expected_fill, costed_fill)
 
-            if not self._portfolio_can_apply(portfolio, costed_fills):
+            posting = portfolio.post(costed_fills)
+            if not posting.accepted:
                 orders[order_id] = replace(order, status=OrderStatus.REJECTED)
-                failure_reason = (
-                    "Insufficient cash at execution"
-                    if order.intent.side is Side.BUY
-                    else "Insufficient position at execution"
-                )
                 events.append(
                     OrderEvent(
                         order_id=order_id,
                         time=time,
                         phase=phase.value,
                         type=OrderEventType.REJECTED,
-                        reason=failure_reason,
+                        reason=posting.reason,
                     )
                 )
                 continue
 
             for costed_fill in costed_fills:
                 fill = costed_fill.fill
-                applied = (
-                    portfolio.buy(fill.symbol, fill.quantity, fill.price)
-                    if fill.side is Side.BUY
-                    else portfolio.sell(fill.symbol, fill.quantity, fill.price)
-                )
-                if not applied:
-                    raise RuntimeError("Validated fill could not be applied to the portfolio")
                 fills.append(fill)
                 execution_costs.append(costed_fill.cost)
                 trades.append(
@@ -416,9 +415,6 @@ class Engine:
                         phase=fill.phase.value,
                     )
                 )
-            direct_cost = sum(item.cost.direct_cost for item in costed_fills)
-            if not portfolio.deduct_cash(direct_cost):
-                raise RuntimeError("Validated execution costs could not be applied")
             next_fill_id += len(costed_fills)
 
             order_status = (
@@ -495,21 +491,3 @@ class Engine:
                 raise ValueError("Fill instrument or side does not match its order")
             if fill.time != market.time or fill.phase is not market.phase:
                 raise ValueError("Fill time or phase does not match the execution event")
-
-    @staticmethod
-    def _portfolio_can_apply(portfolio: Portfolio, costed_fills: tuple[CostedFill, ...]) -> bool:
-        if not costed_fills:
-            return True
-        fills = tuple(item.fill for item in costed_fills)
-        direct_cost = sum(item.cost.direct_cost for item in costed_fills)
-        first_fill = fills[0]
-        if first_fill.side is Side.BUY:
-            purchase_cost = sum(fill.quantity * fill.price for fill in fills)
-            return portfolio.balance >= purchase_cost + direct_cost
-        holding = portfolio.holdings.get(first_fill.symbol)
-        proceeds = sum(fill.quantity * fill.price for fill in fills)
-        return (
-            holding is not None
-            and holding.quantity >= sum(fill.quantity for fill in fills)
-            and portfolio.balance + proceeds >= direct_cost
-        )
