@@ -4,6 +4,12 @@ from dataclasses import replace
 from datetime import date
 from enum import Enum
 
+from tbt_engine.costs import (
+    CostedFill,
+    ExecutionCost,
+    TransactionCostModel,
+    ZeroTransactionCostModel,
+)
 from tbt_engine.execution import (
     DailyBarExecutionModel,
     ExecutionMarketState,
@@ -12,6 +18,7 @@ from tbt_engine.execution import (
     ExecutionOutcomeStatus,
     ExecutionPhase,
     Fill,
+    FillId,
 )
 from tbt_engine.market import (
     BeforeOpenMarketState,
@@ -57,6 +64,7 @@ class Engine:
         interval: str = "1d",
         initial_balance: float = 1000.0,
         execution_model: ExecutionModel | None = None,
+        transaction_cost_model: TransactionCostModel | None = None,
     ):
         if provider is None:
             from tbt_engine.providers.yahoo_provider import YahooProvider
@@ -68,10 +76,16 @@ class Engine:
         self.end_date = end_date
         self.interval = interval
         self.initial_balance = float(initial_balance)
-        self.execution_model = execution_model or DailyBarExecutionModel()
+        self.execution_model = (
+            DailyBarExecutionModel() if execution_model is None else execution_model
+        )
+        self.transaction_cost_model = (
+            ZeroTransactionCostModel() if transaction_cost_model is None else transaction_cost_model
+        )
 
     def start(self, strategy: Strategy) -> BacktestResult:
         logger.info("Running strategy: %s", strategy.name)
+        self._validate_cost_model_capabilities()
         portfolio = Portfolio(self.initial_balance)
         market = Market(
             provider=self.provider,
@@ -84,9 +98,11 @@ class Engine:
         trades: list[Trade] = []
         equity_history: list[EquityPoint] = []
         fills: list[Fill] = []
+        execution_costs: list[ExecutionCost] = []
         orders: dict[OrderId, Order] = {}
         order_events: list[OrderEvent] = []
         next_order_id = 1
+        next_fill_id = 1
 
         while market.next_candle() < market.final_candle:
             before_open = BeforeOpenMarketState(market)
@@ -105,16 +121,18 @@ class Engine:
                 next_order_id,
             )
 
-            self._execute_orders(
+            next_fill_id = self._execute_orders(
                 orders,
                 order_events,
                 trades,
                 fills,
+                execution_costs,
                 portfolio,
                 market,
                 candle_time,
                 SimulationPhase.OPEN,
                 ExecutionTime.NEXT_OPEN,
+                next_fill_id,
             )
 
             open_state = OpenMarketState(market)
@@ -132,16 +150,18 @@ class Engine:
                 next_order_id,
             )
 
-            self._execute_orders(
+            next_fill_id = self._execute_orders(
                 orders,
                 order_events,
                 trades,
                 fills,
+                execution_costs,
                 portfolio,
                 market,
                 candle_time,
                 SimulationPhase.CLOSE,
                 ExecutionTime.SESSION_CLOSE,
+                next_fill_id,
             )
 
             closed_state = ClosedMarketState(market)
@@ -187,6 +207,7 @@ class Engine:
             orders=list(orders.values()),
             order_events=order_events,
             fills=fills,
+            execution_costs=execution_costs,
         )
         logger.info(
             "Finished %s: equity=%.2f return=%.2f%% trades=%d",
@@ -282,12 +303,14 @@ class Engine:
         events: list[OrderEvent],
         trades: list[Trade],
         fills: list[Fill],
+        execution_costs: list[ExecutionCost],
         portfolio: Portfolio,
         market: Market,
         time: str,
         phase: SimulationPhase,
         execution_time: ExecutionTime,
-    ) -> None:
+        next_fill_id: int,
+    ) -> int:
         execution_phase = (
             ExecutionPhase.OPEN
             if execution_time is ExecutionTime.NEXT_OPEN
@@ -341,7 +364,19 @@ class Engine:
                 )
                 continue
 
-            if not self._portfolio_can_apply(portfolio, outcome.fills):
+            costed_fills = tuple(
+                self.transaction_cost_model.apply(
+                    replace(fill, id=FillId(next_fill_id + index)),
+                    execution_market,
+                    is_first_fill_for_order=(order.filled_quantity == 0 and index == 0),
+                )
+                for index, fill in enumerate(outcome.fills)
+            )
+            for index, costed_fill in enumerate(costed_fills):
+                expected_fill = replace(outcome.fills[index], id=FillId(next_fill_id + index))
+                self._validate_costed_fill(expected_fill, costed_fill)
+
+            if not self._portfolio_can_apply(portfolio, costed_fills):
                 orders[order_id] = replace(order, status=OrderStatus.REJECTED)
                 failure_reason = (
                     "Insufficient cash at execution"
@@ -359,7 +394,8 @@ class Engine:
                 )
                 continue
 
-            for fill in outcome.fills:
+            for costed_fill in costed_fills:
+                fill = costed_fill.fill
                 applied = (
                     portfolio.buy(fill.symbol, fill.quantity, fill.price)
                     if fill.side is Side.BUY
@@ -368,6 +404,7 @@ class Engine:
                 if not applied:
                     raise RuntimeError("Validated fill could not be applied to the portfolio")
                 fills.append(fill)
+                execution_costs.append(costed_fill.cost)
                 trades.append(
                     Trade(
                         time=fill.time,
@@ -379,6 +416,10 @@ class Engine:
                         phase=fill.phase.value,
                     )
                 )
+            direct_cost = sum(item.cost.direct_cost for item in costed_fills)
+            if not portfolio.deduct_cash(direct_cost):
+                raise RuntimeError("Validated execution costs could not be applied")
+            next_fill_id += len(costed_fills)
 
             order_status = (
                 OrderStatus.FILLED
@@ -402,6 +443,32 @@ class Engine:
                     ),
                     reason=outcome.reason,
                 )
+            )
+        return next_fill_id
+
+    def _validate_cost_model_capabilities(self) -> None:
+        required = self.transaction_cost_model.required_capabilities
+        if required:
+            names = ", ".join(sorted(capability.value for capability in required))
+            raise ValueError(
+                "Transaction cost model requires unavailable market data capabilities: " f"{names}"
+            )
+
+    def _validate_costed_fill(self, expected: Fill, actual: CostedFill) -> None:
+        if actual.cost.model != self.transaction_cost_model.name:
+            raise ValueError("Execution cost identifies a different transaction cost model")
+        if (
+            actual.fill.id != expected.id
+            or actual.fill.order_id != expected.order_id
+            or actual.fill.symbol != expected.symbol
+            or actual.fill.side is not expected.side
+            or actual.fill.quantity != expected.quantity
+            or actual.fill.time != expected.time
+            or actual.fill.phase is not expected.phase
+            or actual.fill.reference_price != expected.reference_price
+        ):
+            raise ValueError(
+                "Transaction cost model changed fill fields other than execution price"
             )
 
     @staticmethod
@@ -430,11 +497,19 @@ class Engine:
                 raise ValueError("Fill time or phase does not match the execution event")
 
     @staticmethod
-    def _portfolio_can_apply(portfolio: Portfolio, fills: tuple[Fill, ...]) -> bool:
-        if not fills:
+    def _portfolio_can_apply(portfolio: Portfolio, costed_fills: tuple[CostedFill, ...]) -> bool:
+        if not costed_fills:
             return True
+        fills = tuple(item.fill for item in costed_fills)
+        direct_cost = sum(item.cost.direct_cost for item in costed_fills)
         first_fill = fills[0]
         if first_fill.side is Side.BUY:
-            return portfolio.balance >= sum(fill.quantity * fill.price for fill in fills)
+            purchase_cost = sum(fill.quantity * fill.price for fill in fills)
+            return portfolio.balance >= purchase_cost + direct_cost
         holding = portfolio.holdings.get(first_fill.symbol)
-        return holding is not None and holding.quantity >= sum(fill.quantity for fill in fills)
+        proceeds = sum(fill.quantity * fill.price for fill in fills)
+        return (
+            holding is not None
+            and holding.quantity >= sum(fill.quantity for fill in fills)
+            and portfolio.balance + proceeds >= direct_cost
+        )

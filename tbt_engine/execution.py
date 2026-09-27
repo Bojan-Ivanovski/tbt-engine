@@ -3,9 +3,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
-from typing import Mapping
+from typing import Mapping, NewType
 
 from tbt_engine.orders import Order, OrderId, Side
+
+FillId = NewType("FillId", int)
 
 
 class ExecutionPhase(str, Enum):
@@ -29,15 +31,23 @@ class Fill:
     price: float
     time: str
     phase: ExecutionPhase
+    id: FillId | None = None
+    reference_price: float | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "symbol", self.symbol.upper())
         object.__setattr__(self, "quantity", float(self.quantity))
         object.__setattr__(self, "price", float(self.price))
+        reference_price = (
+            self.price if self.reference_price is None else float(self.reference_price)
+        )
+        object.__setattr__(self, "reference_price", reference_price)
         if not math.isfinite(self.quantity) or self.quantity <= 0:
             raise ValueError("Fill quantity must be finite and greater than zero")
         if not math.isfinite(self.price) or self.price <= 0:
             raise ValueError("Fill price must be finite and greater than zero")
+        if not math.isfinite(reference_price) or reference_price <= 0:
+            raise ValueError("Fill reference price must be finite and greater than zero")
 
 
 @dataclass(frozen=True)

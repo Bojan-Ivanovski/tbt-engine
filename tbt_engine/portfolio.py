@@ -1,3 +1,4 @@
+import math
 from typing import Dict
 
 from tbt_engine.asset import Asset
@@ -31,6 +32,12 @@ class Portfolio:
         self.balance += quantity * price
         if holding.quantity == 0:
             del self.holdings[symbol]
+        return True
+
+    def deduct_cash(self, amount: float) -> bool:
+        if not math.isfinite(amount) or amount < 0 or self.balance < amount:
+            return False
+        self.balance -= amount
         return True
 
 
