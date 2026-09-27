@@ -1,6 +1,5 @@
 """Public API for TBT Engine."""
 
-from tbt_engine.core.asset import Asset
 from tbt_engine.core.collection import (
     InMemoryResultCollector,
     ResultCollector,
@@ -69,7 +68,6 @@ from tbt_engine.engine import Engine
 from tbt_engine.providers import Provider, YahooProvider
 
 __all__ = [
-    "Asset",
     "BacktestResult",
     "BeforeOpenMarketState",
     "CancelOrder",

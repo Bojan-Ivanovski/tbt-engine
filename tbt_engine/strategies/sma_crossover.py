@@ -51,7 +51,7 @@ class SmaCrossoverStrategy(Strategy):
             short_current = float(closes[-self.short_window :].mean())
             long_current = float(closes[-self.long_window :].mean())
 
-            held_quantity = float(getattr(holdings.get(symbol), "quantity", 0.0))
+            held_quantity = holdings.get(symbol, 0.0)
             crossed_up = short_previous <= long_previous and short_current > long_current
             crossed_down = short_previous >= long_previous and short_current < long_current
 

@@ -40,7 +40,7 @@ class ObserveInitialPortfolioStrategy(Strategy):
         if not self.symbols:
             self.symbols = tuple(market.get_all_symbols())
             self.cash = portfolio.balance()
-            self.quantity = portfolio.holdings()["TEST"].quantity
+            self.quantity = portfolio.holdings()["TEST"]
         return []
 
 
