@@ -83,6 +83,7 @@ class LedgerEntry:
 
 @dataclass(frozen=True)
 class LedgerState:
+    currency: str
     cash: float
     positions: tuple[tuple[str, float], ...]
 
@@ -274,9 +275,9 @@ class PortfolioLedger:
                 positions[entry.symbol] = positions.get(entry.symbol, 0.0) + entry.quantity_delta
         return cash, positions
 
-    @staticmethod
-    def _make_state(cash: float, positions: dict[str, float]) -> LedgerState:
+    def _make_state(self, cash: float, positions: dict[str, float]) -> LedgerState:
         return LedgerState(
+            currency=self._base_currency,
             cash=PortfolioLedger._normalize_zero(cash),
             positions=tuple(
                 sorted(

@@ -20,6 +20,7 @@ from tbt_engine.execution import (
     Fill,
     FillId,
 )
+from tbt_engine.ledger import LedgerState
 from tbt_engine.market import (
     BeforeOpenMarketState,
     ClosedMarketState,
@@ -41,6 +42,13 @@ from tbt_engine.portfolio import Portfolio, PortfolioState
 from tbt_engine.providers.provider import Provider
 from tbt_engine.result import BacktestResult, EquityPoint, Trade
 from tbt_engine.strategy import Strategy
+from tbt_engine.valuation import (
+    ClosePriceValuationModel,
+    PortfolioValuation,
+    ValuationMarketState,
+    ValuationModel,
+    ValuationPhase,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +73,7 @@ class Engine:
         execution_model: ExecutionModel | None = None,
         transaction_cost_model: TransactionCostModel | None = None,
         portfolio_currency: str = "USD",
+        valuation_model: ValuationModel | None = None,
     ):
         if provider is None:
             from tbt_engine.providers.yahoo_provider import YahooProvider
@@ -87,6 +96,9 @@ class Engine:
             if transaction_cost_model is None
             else transaction_cost_model
         )
+        self.valuation_model = (
+            ClosePriceValuationModel() if valuation_model is None else valuation_model
+        )
 
     def start(self, strategy: Strategy) -> BacktestResult:
         logger.info("Running strategy: %s", strategy.name)
@@ -106,6 +118,7 @@ class Engine:
 
         trades: list[Trade] = []
         equity_history: list[EquityPoint] = []
+        valuations: list[PortfolioValuation] = []
         fills: list[Fill] = []
         execution_costs: list[ExecutionCost] = []
         orders: dict[OrderId, Order] = {}
@@ -188,11 +201,22 @@ class Engine:
                 next_order_id,
             )
 
-            equity = portfolio.balance + sum(
-                asset.quantity * closed_state.get_latest_closed(symbol)
-                for symbol, asset in portfolio.holdings.items()
+            valuation_market = ValuationMarketState(
+                time=candle_time,
+                phase=ValuationPhase.CLOSE,
+                prices={symbol: closed_state.get_latest_closed(symbol) for symbol in market.assets},
             )
-            equity_history.append(EquityPoint(candle_time, equity))
+            valuation = self.valuation_model.value(
+                portfolio.ledger.state,
+                valuation_market,
+            )
+            self._validate_valuation(
+                valuation,
+                portfolio.ledger.state,
+                valuation_market,
+            )
+            valuations.append(valuation)
+            equity_history.append(EquityPoint(candle_time, valuation.total_equity))
 
         final_time = equity_history[-1].time
         for order_id, order in tuple(orders.items()):
@@ -218,6 +242,7 @@ class Engine:
             fills=fills,
             execution_costs=execution_costs,
             ledger_entries=list(portfolio.ledger.entries),
+            valuations=valuations,
         )
         logger.info(
             "Finished %s: equity=%.2f return=%.2f%% trades=%d",
@@ -449,6 +474,29 @@ class Engine:
             raise ValueError(
                 "Transaction cost model requires unavailable market data capabilities: " f"{names}"
             )
+
+    def _validate_valuation(
+        self,
+        valuation: PortfolioValuation,
+        portfolio: LedgerState,
+        market: ValuationMarketState,
+    ) -> None:
+        valued_positions = {position.symbol: position.quantity for position in valuation.positions}
+        if valuation.model != self.valuation_model.name:
+            raise ValueError("Valuation identifies a different model")
+        if valuation.time != market.time or valuation.phase is not market.phase:
+            raise ValueError("Valuation time or phase does not match the market snapshot")
+        if valuation.currency != portfolio.currency:
+            raise ValueError("Valuation currency does not match the portfolio")
+        if not math.isclose(
+            valuation.cash,
+            portfolio.cash,
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("Valuation cash does not match the portfolio")
+        if valued_positions != portfolio.as_positions():
+            raise ValueError("Valuation positions do not match the portfolio")
 
     def _validate_costed_fill(self, expected: Fill, actual: CostedFill) -> None:
         if actual.cost.model != self.transaction_cost_model.name:

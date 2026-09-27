@@ -91,6 +91,12 @@ The ledger validates the complete execution batch before committing it, so insuf
 
 `Engine(portfolio_currency=...)` selects the single portfolio base currency and defaults to `USD`. Transaction costs in another currency are rejected explicitly; foreign-exchange conversion is not inferred by the engine.
 
+## Portfolio valuation
+
+`Engine` uses `ClosePriceValuationModel` by default and accepts another implementation through `valuation_model=...`. After each close, the model receives immutable ledger-derived cash and positions plus a `ValuationMarketState` containing only the completed session's closing prices. It cannot access future candles or mutate accounting state.
+
+Each immutable `PortfolioValuation` records its time, phase, model, currency, cash, position quantities, prices, market values, and reconciled total equity. These records are returned through `BacktestResult.valuations`; the existing equity history and ending equity retain their previous values under the default model.
+
 ## Run the example
 
 ```bash
@@ -106,4 +112,5 @@ The included example applies a 5-day/20-day moving-average crossover to AAPL, NV
 - explicit fills linked to their originating orders
 - transaction-cost breakdowns linked to their fills
 - immutable cash and position ledger entries
+- auditable portfolio valuations
 - equity history
