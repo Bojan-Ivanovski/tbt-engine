@@ -1,6 +1,11 @@
 """Public API for TBT Engine."""
 
 from tbt_engine.asset import Asset
+from tbt_engine.collection import (
+    InMemoryResultCollector,
+    ResultCollector,
+    SimulationRecord,
+)
 from tbt_engine.costs import (
     CostedFill,
     ExecutionCost,
@@ -83,6 +88,7 @@ __all__ = [
     "ExecutionPhase",
     "Fill",
     "FillId",
+    "InMemoryResultCollector",
     "LedgerEntry",
     "LedgerEntryId",
     "LedgerEntryType",
@@ -103,10 +109,12 @@ __all__ = [
     "PortfolioValuation",
     "PositionValuation",
     "Provider",
+    "ResultCollector",
     "Sell",
     "Signal",
     "Side",
     "SimulationPhase",
+    "SimulationRecord",
     "StandardTransactionCostModel",
     "Strategy",
     "StrategyCommand",
