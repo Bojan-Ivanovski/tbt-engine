@@ -14,7 +14,7 @@ from tbt_engine.costs import (
     TransactionCostModel,
     ZeroTransactionCostModel,
 )
-from tbt_engine.engine import Engine, SimulationPhase
+from tbt_engine.engine import Engine
 from tbt_engine.execution import (
     DailyBarExecutionModel,
     ExecutionMarketState,
@@ -53,6 +53,7 @@ from tbt_engine.orders import (
     StrategyCommand,
     SubmitOrder,
 )
+from tbt_engine.pipeline import SimulationPhase, SimulationPipeline
 from tbt_engine.portfolio import PortfolioState
 from tbt_engine.providers import Provider, YahooProvider
 from tbt_engine.result import BacktestResult, EquityPoint, Trade
@@ -114,6 +115,7 @@ __all__ = [
     "Signal",
     "Side",
     "SimulationPhase",
+    "SimulationPipeline",
     "SimulationRecord",
     "StandardTransactionCostModel",
     "Strategy",
