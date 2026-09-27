@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from tbt_engine.costs import ExecutionCost
 from tbt_engine.execution import Fill
+from tbt_engine.ledger import LedgerEntry
 from tbt_engine.orders import Order, OrderEvent, OrderId
 
 
@@ -32,6 +33,7 @@ class BacktestResult:
     order_events: list[OrderEvent] = field(default_factory=lambda: list[OrderEvent]())
     fills: list[Fill] = field(default_factory=lambda: list[Fill]())
     execution_costs: list[ExecutionCost] = field(default_factory=lambda: list[ExecutionCost]())
+    ledger_entries: list[LedgerEntry] = field(default_factory=lambda: list[LedgerEntry]())
 
     @property
     def total_return_pct(self) -> float:

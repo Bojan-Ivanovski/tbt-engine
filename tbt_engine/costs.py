@@ -113,6 +113,12 @@ class TransactionCostModel(ABC):
 
 
 class ZeroTransactionCostModel(TransactionCostModel):
+    def __init__(self, *, currency: str = "USD"):
+        normalized_currency = currency.strip().upper()
+        if len(normalized_currency) != 3 or not normalized_currency.isalpha():
+            raise ValueError("currency must be a three-letter code")
+        self._currency = normalized_currency
+
     @property
     def name(self) -> str:
         return "zero"
@@ -120,6 +126,10 @@ class ZeroTransactionCostModel(TransactionCostModel):
     @property
     def parameters(self) -> Mapping[str, float]:
         return {}
+
+    @property
+    def currency(self) -> str:
+        return self._currency
 
     def apply(
         self,

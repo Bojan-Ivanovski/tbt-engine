@@ -83,6 +83,14 @@ Spread and slippage adjust the execution price upward for buys and downward for 
 
 Custom `TransactionCostModel` implementations can declare additional `MarketDataCapability` requirements. The engine rejects a model before simulation when its requirements are unavailable instead of silently estimating missing quote, trade, volatility, volume, or order-book data. Model construction is programmatic; project-wide configuration integration is intentionally separate.
 
+## Portfolio accounting
+
+Portfolio cash and long-only positions are derived from an append-only `PortfolioLedger`. The ledger begins with an opening-cash entry and atomically posts each accepted execution as a trade entry plus separate commission and fee entries. Every execution entry links back to its order and fill. Spread and slippage are already reflected in the fill price and are not posted again as cash charges.
+
+The ledger validates the complete execution batch before committing it, so insufficient cash, insufficient positions, duplicate fills, inconsistent references, or unsupported currencies cannot leave a partially updated portfolio. Its cached current state can be reconstructed with `PortfolioLedger.replay()`, and all immutable entries are returned through `BacktestResult.ledger_entries`.
+
+`Engine(portfolio_currency=...)` selects the single portfolio base currency and defaults to `USD`. Transaction costs in another currency are rejected explicitly; foreign-exchange conversion is not inferred by the engine.
+
 ## Run the example
 
 ```bash
@@ -97,4 +105,5 @@ The included example applies a 5-day/20-day moving-average crossover to AAPL, NV
 - orders and their lifecycle events
 - explicit fills linked to their originating orders
 - transaction-cost breakdowns linked to their fills
+- immutable cash and position ledger entries
 - equity history
