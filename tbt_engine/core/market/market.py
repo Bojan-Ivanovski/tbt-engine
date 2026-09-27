@@ -49,18 +49,20 @@ class MarketAsset:
 class Market:
     def __init__(
         self,
-        provider: Provider,
-        start: date,
+        start: date = date(2000, 1, 1),
         end: date | None = None,
         interval: str = "1d",
     ):
-        self.provider = provider
         self.start = start
         self.end = end
         self.interval = interval
+        self._provider: Provider | None = None
         self.assets: Dict[str, MarketAsset] = {}
         self.current_candle = -1
         self.final_candle = 0
+
+    def set_provider(self, provider: Provider) -> None:
+        self._provider = provider
 
     def set_assets(self, symbols: Iterable[str]) -> None:
         normalized_symbols = sorted(set(symbol.upper() for symbol in symbols))
@@ -69,9 +71,12 @@ class Market:
 
         self.assets = {symbol: self._load_asset(symbol) for symbol in normalized_symbols}
         self._align_assets()
+        self.current_candle = -1
 
     def _load_asset(self, symbol: str) -> MarketAsset:
-        history = self.provider.get_history(
+        if self._provider is None:
+            raise RuntimeError("A market provider must be set before loading assets")
+        history = self._provider.get_history(
             symbol=symbol,
             start=self.start,
             end=self.end,

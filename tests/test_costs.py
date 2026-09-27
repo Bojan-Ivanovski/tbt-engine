@@ -8,6 +8,7 @@ from tbt_engine import (
     Fill,
     FillId,
     InitialPortfolio,
+    Market,
     MarketDataCapability,
     OrderId,
     Side,
@@ -119,6 +120,7 @@ class TransactionCostModelTests(unittest.TestCase):
 class EngineTransactionCostTests(unittest.TestCase):
     def test_engine_applies_costs_and_exposes_linked_records(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             transaction_cost_model=StandardTransactionCostModel(
@@ -137,7 +139,9 @@ class EngineTransactionCostTests(unittest.TestCase):
 
     def test_default_engine_behavior_has_explicit_zero_costs(self) -> None:
         result = Engine(
-            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+            market=Market(),
+            provider=InMemoryProvider(),
+            initial_portfolio=InitialPortfolio(cash=100),
         ).start(NextOpenStrategy())
 
         self.assertEqual(len(result.execution_costs), 1)
@@ -152,12 +156,16 @@ class EngineTransactionCostTests(unittest.TestCase):
             slippage_bps=3,
         )
 
-        first = Engine(provider=InMemoryProvider(), transaction_cost_model=model).start(
-            NextOpenStrategy()
-        )
-        second = Engine(provider=InMemoryProvider(), transaction_cost_model=model).start(
-            NextOpenStrategy()
-        )
+        first = Engine(
+            market=Market(),
+            provider=InMemoryProvider(),
+            transaction_cost_model=model,
+        ).start(NextOpenStrategy())
+        second = Engine(
+            market=Market(),
+            provider=InMemoryProvider(),
+            transaction_cost_model=model,
+        ).start(NextOpenStrategy())
 
         self.assertEqual(first.fills, second.fills)
         self.assertEqual(first.execution_costs, second.execution_costs)
@@ -165,6 +173,7 @@ class EngineTransactionCostTests(unittest.TestCase):
 
     def test_direct_costs_are_included_in_buy_affordability(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=40),
             transaction_cost_model=StandardTransactionCostModel(commission_per_order=1),
@@ -176,6 +185,7 @@ class EngineTransactionCostTests(unittest.TestCase):
 
     def test_partial_fills_only_charge_per_order_commission_once(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             execution_model=PartialExecutionModel(),
@@ -187,6 +197,7 @@ class EngineTransactionCostTests(unittest.TestCase):
 
     def test_engine_rejects_unavailable_market_data_capabilities(self) -> None:
         engine = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             transaction_cost_model=QuoteRequiredCostModel(),
         )

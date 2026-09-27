@@ -10,6 +10,7 @@ from tbt_engine import (
     InitialPortfolio,
     LedgerEntryId,
     LedgerEntryType,
+    Market,
     OrderId,
     OrderStatus,
     PortfolioLedger,
@@ -181,6 +182,7 @@ class PortfolioLedgerTests(unittest.TestCase):
 class EngineLedgerTests(unittest.TestCase):
     def test_engine_exposes_reconcilable_ledger_entries(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             transaction_cost_model=StandardTransactionCostModel(
@@ -204,6 +206,7 @@ class EngineLedgerTests(unittest.TestCase):
 
     def test_engine_rejects_mismatched_cost_currency(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100),
             transaction_cost_model=StandardTransactionCostModel(currency="EUR"),
@@ -217,6 +220,7 @@ class EngineLedgerTests(unittest.TestCase):
 
     def test_default_zero_cost_model_uses_initial_portfolio_currency(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=100, currency="EUR"),
         ).start(NextOpenStrategy())
@@ -226,6 +230,7 @@ class EngineLedgerTests(unittest.TestCase):
 
     def test_multi_fill_outcome_is_rejected_without_partial_posting(self) -> None:
         result = Engine(
+            market=Market(),
             provider=InMemoryProvider(),
             initial_portfolio=InitialPortfolio(cash=30),
             execution_model=MultipleFillExecutionModel(),
