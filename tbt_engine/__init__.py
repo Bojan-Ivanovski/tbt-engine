@@ -53,6 +53,14 @@ from tbt_engine.providers import Provider, YahooProvider
 from tbt_engine.result import BacktestResult, EquityPoint, Trade
 from tbt_engine.signals import Buy, Sell, Signal
 from tbt_engine.strategy import Strategy
+from tbt_engine.valuation import (
+    ClosePriceValuationModel,
+    PortfolioValuation,
+    PositionValuation,
+    ValuationMarketState,
+    ValuationModel,
+    ValuationPhase,
+)
 
 __all__ = [
     "Asset",
@@ -61,6 +69,7 @@ __all__ = [
     "Buy",
     "CancelOrder",
     "ClosedMarketState",
+    "ClosePriceValuationModel",
     "CostedFill",
     "DailyBarExecutionModel",
     "Engine",
@@ -91,6 +100,8 @@ __all__ = [
     "OrderStatus",
     "PortfolioState",
     "PortfolioLedger",
+    "PortfolioValuation",
+    "PositionValuation",
     "Provider",
     "Sell",
     "Signal",
@@ -102,6 +113,9 @@ __all__ = [
     "SubmitOrder",
     "Trade",
     "TransactionCostModel",
+    "ValuationMarketState",
+    "ValuationModel",
+    "ValuationPhase",
     "YahooProvider",
     "ZeroTransactionCostModel",
 ]
