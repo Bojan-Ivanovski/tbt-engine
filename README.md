@@ -41,6 +41,22 @@ from tbt_engine import Engine, Strategy
 
 Market-data providers, phase-specific market snapshots, orders, portfolio snapshots, result types, and assets are also available from the top-level package. To use another market data source, implement `Provider.get_history()` and pass the provider to `Engine`. Price history must contain `Open` and `Close` columns.
 
+The starting state is supplied as one immutable portfolio definition:
+
+```python
+from tbt_engine import Engine, InitialPortfolio, InitialPosition
+
+engine = Engine(
+    initial_portfolio=InitialPortfolio(
+        cash=10_000,
+        currency="USD",
+        positions=(InitialPosition("AAPL", quantity=10),),
+    )
+)
+```
+
+The Market registers the union of `Strategy.define_assets()` and initial-position symbols. Strategy snapshots, order validation, and execution are restricted to the strategy-defined subset, while complete registered data remains available for portfolio valuation. Initial quantities enter the ledger as opening state rather than simulated trades, and their first available opening prices establish starting equity before any strategy command or execution event.
+
 The simulation-domain implementation lives under `tbt_engine.core`. Consumers should normally use the package-level exports above; internal module imports use the `tbt_engine.core` namespace. Providers, signals, and reusable strategy implementations remain organized in their existing domain packages.
 
 ## Simulation pipeline
@@ -93,11 +109,11 @@ Custom `TransactionCostModel` implementations can declare additional `MarketData
 
 ## Portfolio accounting
 
-Portfolio cash and long-only positions are derived from an append-only `PortfolioLedger`. The ledger begins with an opening-cash entry and atomically posts each accepted execution as a trade entry plus separate commission and fee entries. Every execution entry links back to its order and fill. Spread and slippage are already reflected in the fill price and are not posted again as cash charges.
+Portfolio cash and long-only positions are derived from an append-only `PortfolioLedger`. The ledger begins with opening-cash and opening-position entries, then atomically posts each accepted execution as a trade entry plus separate commission and fee entries. Every execution entry links back to its order and fill. Spread and slippage are already reflected in the fill price and are not posted again as cash charges.
 
 The ledger validates the complete execution batch before committing it, so insufficient cash, insufficient positions, duplicate fills, inconsistent references, or unsupported currencies cannot leave a partially updated portfolio. Its cached current state can be reconstructed with `PortfolioLedger.replay()`, and all immutable entries are returned through `BacktestResult.ledger_entries`.
 
-`Engine(portfolio_currency=...)` selects the single portfolio base currency and defaults to `USD`. Transaction costs in another currency are rejected explicitly; foreign-exchange conversion is not inferred by the engine.
+`InitialPortfolio(currency=...)` selects the single portfolio base currency and defaults to `USD`. Transaction costs in another currency are rejected explicitly; foreign-exchange conversion is not inferred by the engine.
 
 ## Portfolio valuation
 

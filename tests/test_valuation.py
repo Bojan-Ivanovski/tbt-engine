@@ -3,6 +3,7 @@ import unittest
 from tbt_engine import (
     ClosePriceValuationModel,
     Engine,
+    InitialPortfolio,
     LedgerState,
     PortfolioValuation,
     PositionValuation,
@@ -132,7 +133,9 @@ class ValuationModelTests(unittest.TestCase):
 
 class EngineValuationTests(unittest.TestCase):
     def test_default_valuations_preserve_equity_history(self) -> None:
-        result = Engine(provider=InMemoryProvider(), initial_balance=100).start(NextOpenStrategy())
+        result = Engine(
+            provider=InMemoryProvider(), initial_portfolio=InitialPortfolio(cash=100)
+        ).start(NextOpenStrategy())
 
         self.assertEqual(len(result.valuations), 3)
         self.assertEqual(
@@ -145,7 +148,7 @@ class EngineValuationTests(unittest.TestCase):
     def test_custom_valuation_model_is_injected(self) -> None:
         result = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             valuation_model=DoublePriceValuationModel(),
         ).start(NextOpenStrategy())
 
@@ -158,7 +161,7 @@ class EngineValuationTests(unittest.TestCase):
 
         Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             valuation_model=model,
         ).start(NextOpenStrategy())
 
@@ -174,7 +177,7 @@ class EngineValuationTests(unittest.TestCase):
     def test_engine_rejects_a_valuation_with_wrong_positions(self) -> None:
         engine = Engine(
             provider=InMemoryProvider(),
-            initial_balance=100,
+            initial_portfolio=InitialPortfolio(cash=100),
             valuation_model=InvalidPositionValuationModel(),
         )
 

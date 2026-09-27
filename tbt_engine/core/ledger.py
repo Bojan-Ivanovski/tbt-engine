@@ -12,6 +12,7 @@ LedgerEntryId = NewType("LedgerEntryId", int)
 
 class LedgerEntryType(str, Enum):
     OPENING_CASH = "opening_cash"
+    OPENING_POSITION = "opening_position"
     TRADE = "trade"
     COMMISSION = "commission"
     FEE = "fee"
@@ -65,6 +66,18 @@ class LedgerEntry:
                 or self.unit_price is not None
             ):
                 raise ValueError("Opening cash entry has inconsistent fields")
+            return
+
+        if self.type is LedgerEntryType.OPENING_POSITION:
+            if (
+                self.cash_delta != 0
+                or self.order_id is not None
+                or self.fill_id is not None
+                or self.symbol is None
+                or self.quantity_delta <= 0
+                or self.unit_price is not None
+            ):
+                raise ValueError("Opening position entry has inconsistent fields")
             return
 
         if self.order_id is None or self.fill_id is None or self.symbol is None:
@@ -125,6 +138,7 @@ class PortfolioLedger:
         *,
         base_currency: str = "USD",
         opened_at: str = "initial",
+        opening_positions: Iterable[tuple[str, float]] = (),
     ):
         initial_cash = float(initial_cash)
         currency = base_currency.strip().upper()
@@ -132,7 +146,7 @@ class PortfolioLedger:
             raise ValueError("Initial cash must be finite and non-negative")
         if len(currency) != 3 or not currency.isalpha():
             raise ValueError("Portfolio base currency must be a three-letter code")
-        opening_entry = LedgerEntry(
+        opening_cash_entry = LedgerEntry(
             id=LedgerEntryId(1),
             type=LedgerEntryType.OPENING_CASH,
             time=opened_at,
@@ -140,12 +154,40 @@ class PortfolioLedger:
             currency=currency,
             cash_delta=initial_cash,
         )
+        positions: dict[str, float] = {}
+        for raw_symbol, raw_quantity in opening_positions:
+            symbol = raw_symbol.strip().upper()
+            quantity = float(raw_quantity)
+            if not symbol:
+                raise ValueError("Opening position symbol must not be empty")
+            if not math.isfinite(quantity) or quantity <= 0:
+                raise ValueError("Opening position quantity must be finite and positive")
+            if symbol in positions:
+                raise ValueError("Opening positions cannot contain duplicate symbols")
+            positions[symbol] = quantity
+
+        opening_position_entries = tuple(
+            LedgerEntry(
+                id=LedgerEntryId(index),
+                type=LedgerEntryType.OPENING_POSITION,
+                time=opened_at,
+                phase="initialization",
+                currency=currency,
+                cash_delta=0,
+                symbol=symbol,
+                quantity_delta=quantity,
+            )
+            for index, (symbol, quantity) in enumerate(sorted(positions.items()), start=2)
+        )
         self._base_currency = currency
-        self._entries: list[LedgerEntry] = [opening_entry]
+        self._entries: list[LedgerEntry] = [
+            opening_cash_entry,
+            *opening_position_entries,
+        ]
         self._cash = initial_cash
-        self._positions: dict[str, float] = {}
+        self._positions = positions
         self._posted_fill_ids: set[FillId] = set()
-        self._next_entry_id = 2
+        self._next_entry_id = len(self._entries) + 1
 
     @property
     def base_currency(self) -> str:

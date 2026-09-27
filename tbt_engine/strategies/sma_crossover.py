@@ -28,7 +28,7 @@ class SmaCrossoverStrategy(Strategy):
         self.long_window = long_window
         self.allocation = allocation
 
-    def define_market(self) -> list[str]:
+    def define_assets(self) -> list[str]:
         return self.symbols
 
     def after_close(

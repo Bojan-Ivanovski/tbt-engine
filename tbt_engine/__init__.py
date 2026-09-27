@@ -54,7 +54,7 @@ from tbt_engine.core.orders import (
     SubmitOrder,
 )
 from tbt_engine.core.pipeline import SimulationPhase, SimulationPipeline
-from tbt_engine.core.portfolio import PortfolioState
+from tbt_engine.core.portfolio import InitialPortfolio, InitialPosition, PortfolioState
 from tbt_engine.core.result import BacktestResult, EquityPoint, Trade
 from tbt_engine.core.strategy import Strategy
 from tbt_engine.core.valuation import (
@@ -90,6 +90,8 @@ __all__ = [
     "Fill",
     "FillId",
     "InMemoryResultCollector",
+    "InitialPortfolio",
+    "InitialPosition",
     "LedgerEntry",
     "LedgerEntryId",
     "LedgerEntryType",

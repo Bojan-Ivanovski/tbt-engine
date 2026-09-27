@@ -10,7 +10,7 @@ class Strategy(ABC):
         self.name = name
 
     @abstractmethod
-    def define_market(self) -> list[str]:
+    def define_assets(self) -> list[str]:
         raise NotImplementedError
 
     def before_open(
