@@ -5,7 +5,7 @@ from tbt_engine.core.collection import InMemoryResultCollector, ResultCollector
 from tbt_engine.core.costs import TransactionCostModel, ZeroTransactionCostModel
 from tbt_engine.core.execution import DailyBarExecutionModel, ExecutionModel
 from tbt_engine.core.market import Market
-from tbt_engine.core.pipeline import SimulationPhase, SimulationPipeline
+from tbt_engine.core.pipeline import SimulationPipeline
 from tbt_engine.core.portfolio import InitialPortfolio, Portfolio
 from tbt_engine.core.result import BacktestResult
 from tbt_engine.core.strategy import Strategy
@@ -106,4 +106,4 @@ class Engine:
             )
 
 
-__all__ = ["Engine", "SimulationPhase"]
+__all__ = ["Engine"]

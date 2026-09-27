@@ -1,6 +1,6 @@
 import math
 from datetime import date, datetime, timezone
-from typing import Any, Dict, Iterable, KeysView
+from typing import Any, Dict, Iterable
 
 import pandas as pd
 
@@ -105,53 +105,3 @@ class Market:
     def next_candle(self) -> int:
         self.current_candle += 1
         return self.current_candle
-
-
-class MarketState:
-    def __init__(
-        self,
-        market: Market,
-        symbols: Iterable[str],
-        last_closed_candle: int | None = None,
-    ):
-        normalized_symbols = sorted(set(symbol.upper() for symbol in symbols))
-        missing_symbols = set(normalized_symbols).difference(market.assets)
-        if missing_symbols:
-            missing = ", ".join(sorted(missing_symbols))
-            raise ValueError(f"Strategy assets are not registered in the market: {missing}")
-        self._assets = {symbol: market.assets[symbol] for symbol in normalized_symbols}
-        self._time_asset = next(iter(market.assets.values()))
-        self._current_candle = market.current_candle
-        self._last_closed_candle = (
-            market.current_candle if last_closed_candle is None else last_closed_candle
-        )
-
-    def get_all_symbols(self) -> KeysView[str]:
-        return self._assets.keys()
-
-    def get_past_data(self, symbol: str) -> pd.DataFrame:
-        return self._assets[symbol].get_candle_range(self._last_closed_candle).copy()
-
-    def get_market_time_iso(self) -> str:
-        return self._time_asset.get_candle_time_iso(self._current_candle)
-
-
-class BeforeOpenMarketState(MarketState):
-    def __init__(self, market: Market, symbols: Iterable[str]):
-        super().__init__(market, symbols, market.current_candle - 1)
-
-
-class OpenMarketState(MarketState):
-    def __init__(self, market: Market, symbols: Iterable[str]):
-        super().__init__(market, symbols, market.current_candle - 1)
-
-    def get_current_open(self, symbol: str) -> float:
-        return self._assets[symbol].get_open(self._current_candle)
-
-
-class ClosedMarketState(MarketState):
-    def __init__(self, market: Market, symbols: Iterable[str]):
-        super().__init__(market, symbols, market.current_candle)
-
-    def get_latest_closed(self, symbol: str) -> float:
-        return self._assets[symbol].get_close(self._last_closed_candle)
