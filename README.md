@@ -53,6 +53,14 @@ Hooks return `SubmitOrder` and `CancelOrder` commands. Strategies receive an imm
 
 Orders based on a completed close cannot fill at that same close. `ExecutionTime.NEXT_OPEN` uses the next eligible opening event, while `ExecutionTime.SESSION_CLOSE` is available only to orders submitted before the close is revealed.
 
+## Execution and fills
+
+An order records what a strategy requested; an immutable `Fill` records what an execution model produced. `Engine` accepts a replaceable `ExecutionModel` and provides `DailyBarExecutionModel` by default. The default model creates one complete fill at the eligible daily-bar open or close and does not infer an intraday price path, liquidity, spread, or slippage from OHLCV data.
+
+Execution models receive an eligible order and an immutable `ExecutionMarketState` containing only prices available during that execution phase. They return an `ExecutionOutcome` with zero, one, or multiple fills and never mutate portfolio state directly. Outcomes can fill, partially fill, leave an order pending without a fill, or reject it. The engine validates order-to-fill identity and quantities before applying successful fills.
+
+Custom models can be passed to `Engine(execution_model=...)`. Pending partial quantities remain eligible at later matching execution events, and all fills are available through `BacktestResult.fills`.
+
 ## Run the example
 
 ```bash
@@ -65,4 +73,5 @@ The included example applies a 5-day/20-day moving-average crossover to AAPL, NV
 - total return percentage
 - accepted trades
 - orders and their lifecycle events
+- explicit fills linked to their originating orders
 - equity history

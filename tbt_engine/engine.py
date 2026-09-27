@@ -4,6 +4,15 @@ from dataclasses import replace
 from datetime import date
 from enum import Enum
 
+from tbt_engine.execution import (
+    DailyBarExecutionModel,
+    ExecutionMarketState,
+    ExecutionModel,
+    ExecutionOutcome,
+    ExecutionOutcomeStatus,
+    ExecutionPhase,
+    Fill,
+)
 from tbt_engine.market import (
     BeforeOpenMarketState,
     ClosedMarketState,
@@ -47,6 +56,7 @@ class Engine:
         end_date: date | None = None,
         interval: str = "1d",
         initial_balance: float = 1000.0,
+        execution_model: ExecutionModel | None = None,
     ):
         if provider is None:
             from tbt_engine.providers.yahoo_provider import YahooProvider
@@ -58,6 +68,7 @@ class Engine:
         self.end_date = end_date
         self.interval = interval
         self.initial_balance = float(initial_balance)
+        self.execution_model = execution_model or DailyBarExecutionModel()
 
     def start(self, strategy: Strategy) -> BacktestResult:
         logger.info("Running strategy: %s", strategy.name)
@@ -72,6 +83,7 @@ class Engine:
 
         trades: list[Trade] = []
         equity_history: list[EquityPoint] = []
+        fills: list[Fill] = []
         orders: dict[OrderId, Order] = {}
         order_events: list[OrderEvent] = []
         next_order_id = 1
@@ -97,6 +109,7 @@ class Engine:
                 orders,
                 order_events,
                 trades,
+                fills,
                 portfolio,
                 market,
                 candle_time,
@@ -123,6 +136,7 @@ class Engine:
                 orders,
                 order_events,
                 trades,
+                fills,
                 portfolio,
                 market,
                 candle_time,
@@ -153,7 +167,7 @@ class Engine:
 
         final_time = equity_history[-1].time
         for order_id, order in tuple(orders.items()):
-            if order.status is OrderStatus.PENDING:
+            if order.status in {OrderStatus.PENDING, OrderStatus.PARTIALLY_FILLED}:
                 orders[order_id] = replace(order, status=OrderStatus.EXPIRED)
                 order_events.append(
                     OrderEvent(
@@ -172,6 +186,7 @@ class Engine:
             equity_history=equity_history,
             orders=list(orders.values()),
             order_events=order_events,
+            fills=fills,
         )
         logger.info(
             "Finished %s: equity=%.2f return=%.2f%% trades=%d",
@@ -240,7 +255,10 @@ class Engine:
                 continue
 
             order = orders.get(command.order_id)
-            if order is not None and order.status is OrderStatus.PENDING:
+            if order is not None and order.status in {
+                OrderStatus.PENDING,
+                OrderStatus.PARTIALLY_FILLED,
+            }:
                 orders[command.order_id] = replace(order, status=OrderStatus.CANCELLED)
                 event_type = OrderEventType.CANCELLED
                 reason = None
@@ -258,40 +276,78 @@ class Engine:
             )
         return next_order_id
 
-    @staticmethod
     def _execute_orders(
+        self,
         orders: dict[OrderId, Order],
         events: list[OrderEvent],
         trades: list[Trade],
+        fills: list[Fill],
         portfolio: Portfolio,
         market: Market,
         time: str,
         phase: SimulationPhase,
         execution_time: ExecutionTime,
     ) -> None:
+        execution_phase = (
+            ExecutionPhase.OPEN
+            if execution_time is ExecutionTime.NEXT_OPEN
+            else ExecutionPhase.CLOSE
+        )
+        execution_market = ExecutionMarketState(
+            time=time,
+            phase=execution_phase,
+            prices={
+                symbol: (
+                    asset.get_open(market.current_candle)
+                    if execution_phase is ExecutionPhase.OPEN
+                    else asset.get_close(market.current_candle)
+                )
+                for symbol, asset in market.assets.items()
+            },
+        )
         for order_id, order in tuple(orders.items()):
             if (
-                order.status is not OrderStatus.PENDING
+                order.status not in {OrderStatus.PENDING, OrderStatus.PARTIALLY_FILLED}
                 or order.intent.execution_time is not execution_time
                 or order.eligible_candle > market.current_candle
             ):
                 continue
 
-            asset = market.assets[order.intent.symbol]
-            price = (
-                asset.get_open(market.current_candle)
-                if execution_time is ExecutionTime.NEXT_OPEN
-                else asset.get_close(market.current_candle)
-            )
-            if order.intent.side is Side.BUY:
-                filled = portfolio.buy(order.intent.symbol, order.intent.quantity, price)
-                failure_reason = "Insufficient cash at execution"
-            else:
-                filled = portfolio.sell(order.intent.symbol, order.intent.quantity, price)
-                failure_reason = "Insufficient position at execution"
+            outcome = self.execution_model.execute(order, execution_market)
+            self._validate_execution_outcome(order, outcome, execution_market)
 
-            if not filled:
+            if outcome.status is ExecutionOutcomeStatus.NO_FILL:
+                events.append(
+                    OrderEvent(
+                        order_id=order_id,
+                        time=time,
+                        phase=phase.value,
+                        type=OrderEventType.NO_FILL,
+                        reason=outcome.reason,
+                    )
+                )
+                continue
+
+            if outcome.status is ExecutionOutcomeStatus.REJECTED:
                 orders[order_id] = replace(order, status=OrderStatus.REJECTED)
+                events.append(
+                    OrderEvent(
+                        order_id=order_id,
+                        time=time,
+                        phase=phase.value,
+                        type=OrderEventType.REJECTED,
+                        reason=outcome.reason,
+                    )
+                )
+                continue
+
+            if not self._portfolio_can_apply(portfolio, outcome.fills):
+                orders[order_id] = replace(order, status=OrderStatus.REJECTED)
+                failure_reason = (
+                    "Insufficient cash at execution"
+                    if order.intent.side is Side.BUY
+                    else "Insufficient position at execution"
+                )
                 events.append(
                     OrderEvent(
                         order_id=order_id,
@@ -303,28 +359,82 @@ class Engine:
                 )
                 continue
 
+            for fill in outcome.fills:
+                applied = (
+                    portfolio.buy(fill.symbol, fill.quantity, fill.price)
+                    if fill.side is Side.BUY
+                    else portfolio.sell(fill.symbol, fill.quantity, fill.price)
+                )
+                if not applied:
+                    raise RuntimeError("Validated fill could not be applied to the portfolio")
+                fills.append(fill)
+                trades.append(
+                    Trade(
+                        time=fill.time,
+                        symbol=fill.symbol,
+                        side=fill.side.value,
+                        quantity=fill.quantity,
+                        price=fill.price,
+                        order_id=fill.order_id,
+                        phase=fill.phase.value,
+                    )
+                )
+
+            order_status = (
+                OrderStatus.FILLED
+                if outcome.status is ExecutionOutcomeStatus.FILLED
+                else OrderStatus.PARTIALLY_FILLED
+            )
             orders[order_id] = replace(
                 order,
-                status=OrderStatus.FILLED,
-                filled_at=time,
-                fill_price=price,
+                status=order_status,
+                filled_quantity=order.intent.quantity - outcome.remaining_quantity,
             )
             events.append(
                 OrderEvent(
                     order_id=order_id,
                     time=time,
                     phase=phase.value,
-                    type=OrderEventType.FILLED,
+                    type=(
+                        OrderEventType.FILLED
+                        if order_status is OrderStatus.FILLED
+                        else OrderEventType.PARTIALLY_FILLED
+                    ),
+                    reason=outcome.reason,
                 )
             )
-            trades.append(
-                Trade(
-                    time=time,
-                    symbol=order.intent.symbol,
-                    side=order.intent.side.value,
-                    quantity=order.intent.quantity,
-                    price=price,
-                    order_id=order_id,
-                    phase=phase.value,
-                )
-            )
+
+    @staticmethod
+    def _validate_execution_outcome(
+        order: Order,
+        outcome: ExecutionOutcome,
+        market: ExecutionMarketState,
+    ) -> None:
+        executed_quantity = sum(fill.quantity for fill in outcome.fills)
+        expected_remaining = order.remaining_quantity - executed_quantity
+        if expected_remaining < -1e-12:
+            raise ValueError(f"Execution model overfilled order {order.id}")
+        if not math.isclose(
+            outcome.remaining_quantity,
+            max(0.0, expected_remaining),
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        ):
+            raise ValueError(f"Execution model returned inconsistent quantity for order {order.id}")
+        for fill in outcome.fills:
+            if fill.order_id != order.id:
+                raise ValueError("Fill references a different order")
+            if fill.symbol != order.intent.symbol or fill.side is not order.intent.side:
+                raise ValueError("Fill instrument or side does not match its order")
+            if fill.time != market.time or fill.phase is not market.phase:
+                raise ValueError("Fill time or phase does not match the execution event")
+
+    @staticmethod
+    def _portfolio_can_apply(portfolio: Portfolio, fills: tuple[Fill, ...]) -> bool:
+        if not fills:
+            return True
+        first_fill = fills[0]
+        if first_fill.side is Side.BUY:
+            return portfolio.balance >= sum(fill.quantity * fill.price for fill in fills)
+        holding = portfolio.holdings.get(first_fill.symbol)
+        return holding is not None and holding.quantity >= sum(fill.quantity for fill in fills)
