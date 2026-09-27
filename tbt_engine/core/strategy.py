@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
-from tbt_engine.market import BeforeOpenMarketState, ClosedMarketState, OpenMarketState
-from tbt_engine.orders import OrderState, StrategyCommand
-from tbt_engine.portfolio import PortfolioState
+from tbt_engine.core.market import BeforeOpenMarketState, ClosedMarketState, OpenMarketState
+from tbt_engine.core.orders import OrderState, StrategyCommand
+from tbt_engine.core.portfolio import PortfolioState
 
 
 class Strategy(ABC):

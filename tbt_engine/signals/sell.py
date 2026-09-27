@@ -1,4 +1,4 @@
-from tbt_engine.orders import Side
+from tbt_engine.core.orders import Side
 from tbt_engine.signals.signal import Signal
 
 

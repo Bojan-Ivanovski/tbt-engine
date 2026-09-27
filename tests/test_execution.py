@@ -19,8 +19,8 @@ from tbt_engine import (
     Side,
     StrategyCommand,
 )
-from tbt_engine.market import BeforeOpenMarketState
-from tbt_engine.portfolio import Portfolio, PortfolioState
+from tbt_engine.core.market import BeforeOpenMarketState
+from tbt_engine.core.portfolio import Portfolio, PortfolioState
 from tests.test_simulation_pipeline import InMemoryProvider, NextOpenStrategy
 
 

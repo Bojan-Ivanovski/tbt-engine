@@ -41,6 +41,8 @@ from tbt_engine import Engine, Strategy
 
 Market-data providers, phase-specific market snapshots, orders, portfolio snapshots, result types, and assets are also available from the top-level package. To use another market data source, implement `Provider.get_history()` and pass the provider to `Engine`. Price history must contain `Open` and `Close` columns.
 
+The simulation-domain implementation lives under `tbt_engine.core`. Consumers should normally use the package-level exports above; internal module imports use the `tbt_engine.core` namespace. Providers, signals, and reusable strategy implementations remain organized in their existing domain packages.
+
 ## Simulation pipeline
 
 `Engine` is the setup facade: it loads and aligns provider data, creates the portfolio, validates the selected models, and delegates the run to `SimulationPipeline`. The pipeline owns the deterministic session sequence, strategy callbacks, order processing, execution, accounting, valuation, result delivery, and end-of-data expiry.

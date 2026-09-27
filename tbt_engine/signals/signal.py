@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from tbt_engine.asset import Asset
-from tbt_engine.orders import ExecutionTime, OrderIntent, Side, SubmitOrder
+from tbt_engine.core.asset import Asset
+from tbt_engine.core.orders import ExecutionTime, OrderIntent, Side, SubmitOrder
 
 
 class Signal(ABC):

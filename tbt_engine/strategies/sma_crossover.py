@@ -1,5 +1,5 @@
-from tbt_engine.market import ClosedMarketState
-from tbt_engine.orders import (
+from tbt_engine.core.market import ClosedMarketState
+from tbt_engine.core.orders import (
     ExecutionTime,
     OrderIntent,
     OrderState,
@@ -7,8 +7,8 @@ from tbt_engine.orders import (
     StrategyCommand,
     SubmitOrder,
 )
-from tbt_engine.portfolio import PortfolioState
-from tbt_engine.strategy import Strategy
+from tbt_engine.core.portfolio import PortfolioState
+from tbt_engine.core.strategy import Strategy
 
 
 class SmaCrossoverStrategy(Strategy):

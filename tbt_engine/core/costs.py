@@ -4,8 +4,8 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Mapping
 
-from tbt_engine.execution import ExecutionMarketState, Fill, FillId
-from tbt_engine.orders import Side
+from tbt_engine.core.execution import ExecutionMarketState, Fill, FillId
+from tbt_engine.core.orders import Side
 
 
 class MarketDataCapability(str, Enum):

@@ -5,7 +5,7 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Mapping, NewType
 
-from tbt_engine.orders import Order, OrderId, Side
+from tbt_engine.core.orders import Order, OrderId, Side
 
 FillId = NewType("FillId", int)
 

@@ -23,8 +23,15 @@ from tbt_engine import (
     SubmitOrder,
     ZeroTransactionCostModel,
 )
-from tbt_engine.market import BeforeOpenMarketState, ClosedMarketState, Market, OpenMarketState
-from tbt_engine.portfolio import Portfolio
+from tbt_engine.core.engine import Engine as CoreEngine
+from tbt_engine.core.market import (
+    BeforeOpenMarketState,
+    ClosedMarketState,
+    Market,
+    OpenMarketState,
+)
+from tbt_engine.core.pipeline import SimulationPipeline as CoreSimulationPipeline
+from tbt_engine.core.portfolio import Portfolio
 
 
 class InMemoryProvider(Provider):
@@ -140,6 +147,10 @@ class SessionCloseStrategy(Strategy):
 
 
 class SimulationPipelineTests(unittest.TestCase):
+    def test_public_imports_share_core_implementations(self) -> None:
+        self.assertIs(Engine, CoreEngine)
+        self.assertIs(SimulationPipeline, CoreSimulationPipeline)
+
     def test_direct_pipeline_run_matches_engine_result(self) -> None:
         engine_strategy = NextOpenStrategy()
         pipeline_strategy = NextOpenStrategy()
