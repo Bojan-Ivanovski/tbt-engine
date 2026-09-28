@@ -1,14 +1,18 @@
 from tbt_engine.core.market import ClosedMarketState
 from tbt_engine.core.orders import (
-    ExecutionTime,
-    OrderIntent,
     OrderState,
-    Side,
     StrategyCommand,
-    SubmitOrder,
 )
 from tbt_engine.core.portfolio import PortfolioState
 from tbt_engine.core.strategy import Strategy
+from tbt_engine.strategies._common import (
+    buy_at_next_open,
+    has_active_order,
+    normalize_symbols,
+    require_allocation,
+    require_positive_integer,
+    sell_at_next_open,
+)
 
 
 class SmaCrossoverStrategy(Strategy):
@@ -21,15 +25,17 @@ class SmaCrossoverStrategy(Strategy):
         long_window: int = 20,
         allocation: float = 0.1,
         name: str = "SMA Crossover",
-    ):
+    ) -> None:
         super().__init__(name=name)
-        self.symbols = symbols
-        self.short_window = short_window
-        self.long_window = long_window
-        self.allocation = allocation
+        self.symbols = normalize_symbols(symbols)
+        self.short_window = require_positive_integer(short_window, "Short window")
+        self.long_window = require_positive_integer(long_window, "Long window")
+        if self.short_window >= self.long_window:
+            raise ValueError("Short window must be shorter than long window")
+        self.allocation = require_allocation(allocation)
 
     def define_assets(self) -> list[str]:
-        return self.symbols
+        return list(self.symbols)
 
     def after_close(
         self,
@@ -40,7 +46,9 @@ class SmaCrossoverStrategy(Strategy):
         holdings = portfolio.holdings()
         commands: list[StrategyCommand] = []
 
-        for symbol in market.get_all_symbols():
+        for symbol in self.symbols:
+            if has_active_order(orders, symbol):
+                continue
             candles = market.get_past_data(symbol)
             if len(candles) < self.long_window + 1:
                 continue
@@ -57,27 +65,12 @@ class SmaCrossoverStrategy(Strategy):
 
             if crossed_up and held_quantity == 0:
                 price = market.get_latest_closed(symbol)
-                quantity = (portfolio.balance() * self.allocation) / price
-                commands.append(
-                    SubmitOrder(
-                        OrderIntent(
-                            symbol=symbol,
-                            side=Side.BUY,
-                            quantity=quantity,
-                            execution_time=ExecutionTime.NEXT_OPEN,
-                        )
-                    )
-                )
+                command = buy_at_next_open(symbol, portfolio, price, self.allocation)
+                if command is not None:
+                    commands.append(command)
             elif crossed_down and held_quantity > 0:
-                commands.append(
-                    SubmitOrder(
-                        OrderIntent(
-                            symbol=symbol,
-                            side=Side.SELL,
-                            quantity=held_quantity,
-                            execution_time=ExecutionTime.NEXT_OPEN,
-                        )
-                    )
-                )
+                command = sell_at_next_open(symbol, held_quantity)
+                if command is not None:
+                    commands.append(command)
 
         return commands

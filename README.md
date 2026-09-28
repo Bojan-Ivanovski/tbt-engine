@@ -78,6 +78,22 @@ Hooks return `SubmitOrder` and `CancelOrder` commands. Strategies receive an imm
 
 Orders based on a completed close cannot fill at that same close. `ExecutionTime.NEXT_OPEN` uses the next eligible opening event, while `ExecutionTime.SESSION_CLOSE` is available only to orders submitted before the close is revealed.
 
+## Built-in strategies
+
+Five deterministic long-only strategies are available from `tbt_engine.strategies`:
+
+| Strategy | Signal | Default parameters |
+| --- | --- | --- |
+| `BuyAndHoldStrategy` | Equally buys unowned configured symbols and retains them | 100% total allocation |
+| `SmaCrossoverStrategy` | Buys when the short simple average crosses above the long average and exits on the reverse cross | 5/20 sessions, 10% per entry |
+| `EmaCrossoverStrategy` | Applies the same crossover rule using exponential averages | 12/26 sessions, 10% per entry |
+| `RsiMeanReversionStrategy` | Buys at an oversold RSI reading and exits at an overbought reading | 14 sessions, 30/70 thresholds, 10% per entry |
+| `MacdCrossoverStrategy` | Buys when MACD crosses above its signal line and exits on the reverse cross | 12/26/9 sessions, 10% per entry |
+
+All signals use completed close prices in `after_close()` and submit for the next open, avoiding same-close lookahead. Windows, thresholds, allocations, and symbols are validated during construction. Strategies wait for their declared warm-up history, avoid duplicate orders while an order for the symbol is active, and operate only on their configured assets. Indicator definitions use ordinary close-price inputs: exponential averages use `adjust=False`, RSI uses Wilder smoothing, and MACD is the fast EMA minus the slow EMA with an EMA signal line.
+
+The `allocation` parameter is a fraction in `(0, 1]`. For signal-based strategies it applies to each new entry using the cash visible at signal time. Buy-and-hold interprets it as the total allocation and divides it equally across configured symbols. Execution prices, transaction costs, and fill eligibility remain the responsibility of the configured engine models.
+
 ## Execution and fills
 
 An order records what a strategy requested; an immutable `Fill` records what an execution model produced. `Engine` accepts a replaceable `ExecutionModel` and provides `DailyBarExecutionModel` by default. The default model creates one complete fill at the eligible daily-bar open or close and does not infer an intraday price path, liquidity, spread, or slippage from OHLCV data.
