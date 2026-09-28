@@ -41,6 +41,16 @@ from tbt_engine import Engine, Market, Strategy
 
 Market-data providers, phase-specific market snapshots, orders, portfolio snapshots, and result types are also available from the top-level package. To use another market data source, implement `Provider.get_history()` and pass the provider to `Engine`. Price history must contain `Open` and `Close` columns.
 
+Providers compose domain-specific `Capabilities` objects containing optional `Capability`
+implementations. Every capability has a stable `CapabilityId` used by
+`Provider.supported_capabilities`, while typed capability classes support safe lookup through
+`Provider.require_capability()`. Missing capabilities and domain collections fail explicitly instead
+of requiring method probing. Shared capability contracts live under
+`tbt_engine.providers.capabilities`; concrete provider adapters remain directly under
+`tbt_engine.providers`. Normalized records use `SourceMetadata` for provider provenance and an aware
+retrieval time. The existing `get_history()` method remains the compatibility path until the
+normalized OHLCV capability is introduced.
+
 The starting state is supplied as one immutable portfolio definition:
 
 ```python

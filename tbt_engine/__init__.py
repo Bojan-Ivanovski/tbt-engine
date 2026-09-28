@@ -13,6 +13,19 @@ from tbt_engine.core.costs import (
     TransactionCostModel,
     ZeroTransactionCostModel,
 )
+from tbt_engine.core.errors import (
+    CapabilityDataUnavailableError,
+    CapabilityError,
+    InvalidCapabilityQueryError,
+    ProviderAuthenticationError,
+    ProviderError,
+    ProviderRateLimitError,
+    ProviderRequestError,
+    ProviderResponseError,
+    TbtEngineError,
+    UnsupportedCapabilityError,
+    UnsupportedCapabilityGroupError,
+)
 from tbt_engine.core.execution import (
     DailyBarExecutionModel,
     ExecutionMarketState,
@@ -65,11 +78,23 @@ from tbt_engine.core.valuation import (
     ValuationPhase,
 )
 from tbt_engine.engine import Engine
-from tbt_engine.providers import Provider, YahooProvider
+from tbt_engine.metadata import SourceMetadata
+from tbt_engine.providers import (
+    Capabilities,
+    Capability,
+    CapabilityId,
+    Provider,
+    YahooProvider,
+)
 
 __all__ = [
     "BacktestResult",
     "BeforeOpenMarketState",
+    "CapabilityDataUnavailableError",
+    "CapabilityError",
+    "Capabilities",
+    "Capability",
+    "CapabilityId",
     "CancelOrder",
     "ClosedMarketState",
     "ClosePriceValuationModel",
@@ -89,6 +114,7 @@ __all__ = [
     "InMemoryResultCollector",
     "InitialPortfolio",
     "InitialPosition",
+    "InvalidCapabilityQueryError",
     "LedgerEntry",
     "LedgerEntryId",
     "LedgerEntryType",
@@ -110,17 +136,26 @@ __all__ = [
     "PortfolioValuation",
     "PositionValuation",
     "Provider",
+    "ProviderAuthenticationError",
+    "ProviderError",
+    "ProviderRateLimitError",
+    "ProviderRequestError",
+    "ProviderResponseError",
     "ResultCollector",
     "Side",
     "SimulationPhase",
     "SimulationPipeline",
     "SimulationRecord",
     "StandardTransactionCostModel",
+    "SourceMetadata",
     "Strategy",
     "StrategyCommand",
     "SubmitOrder",
     "Trade",
     "TransactionCostModel",
+    "TbtEngineError",
+    "UnsupportedCapabilityError",
+    "UnsupportedCapabilityGroupError",
     "ValuationMarketState",
     "ValuationModel",
     "ValuationPhase",
