@@ -48,8 +48,14 @@ implementations. Every capability has a stable `CapabilityId` used by
 of requiring method probing. Shared capability contracts live under
 `tbt_engine.providers.capabilities`; concrete provider adapters remain directly under
 `tbt_engine.providers`. Normalized records use `SourceMetadata` for provider provenance and an aware
-retrieval time. The existing `get_history()` method remains the compatibility path until the
-normalized OHLCV capability is introduced.
+retrieval time. Optional capability collections are available as
+`CompanyCapabilities`, `MarketCapabilities`, `MacroCapabilities`,
+`DerivedCapabilities`, and `TextualCapabilities`; each provider may expose only
+the leaf contracts it genuinely supports. Unsupported capability identifiers
+remain explicit through `Provider.require_capability()` and supported requests
+use normalized availability results rather than provider-shaped responses. The
+existing `get_history()` method remains the compatibility path alongside the
+normalized `company.ohlcv` capability.
 
 The starting state is supplied as one immutable portfolio definition:
 
