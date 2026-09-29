@@ -5,7 +5,10 @@ from tbt_engine.providers.capabilities.textual.major_announcements import (
     AnnouncementCategory,
     MajorAnnouncementQuery,
 )
-from tbt_engine.providers.capabilities.textual.textual_data import TextualRequestContext, TextualTimeBasis
+from tbt_engine.providers.capabilities.textual.textual_data import (
+    TextualRequestContext,
+    TextualTimeBasis,
+)
 
 
 class AnnouncementTests(unittest.TestCase):
