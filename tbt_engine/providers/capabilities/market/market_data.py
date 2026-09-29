@@ -48,6 +48,9 @@ class MarketDataResult(Generic[T]):
     reason: str | None = None
 
     def __post_init__(self) -> None:
+        records = tuple(self.records)
+        object.__setattr__(self, "records", records)
+
         reason = self.reason.strip() if self.reason is not None else None
         if reason == "":
             raise ValueError("Market data availability reason must not be empty")
@@ -56,9 +59,9 @@ class MarketDataResult(Generic[T]):
             if reason is not None:
                 raise ValueError("Available market data must not include a failure reason")
         elif self.availability is MarketDataAvailability.PARTIAL:
-            if not self.records or reason is None:
+            if not records or reason is None:
                 raise ValueError("Partial market data requires records and a reason")
-        elif not reason or self.records:
+        elif not reason or records:
             raise ValueError("Unavailable market data requires a reason and no records")
 
         object.__setattr__(self, "reason", reason)

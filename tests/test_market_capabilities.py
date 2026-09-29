@@ -147,6 +147,21 @@ class MarketCapabilityTests(unittest.TestCase):
                 reason=" ",
             )
 
+    def test_result_snapshots_mutable_record_inputs(self) -> None:
+        records = ["first"]
+        result = MarketDataResult[str](
+            market=self.market,
+            source=self.source,
+            availability=MarketDataAvailability.PARTIAL,
+            records=records,  # type: ignore[arg-type]
+            reason="Later coverage is unavailable",
+        )
+
+        records.append("second")
+
+        self.assertEqual(result.records, ("first",))
+        self.assertIsInstance(result.records, tuple)
+
     def test_partial_result_requires_records_and_a_reason(self) -> None:
         partial = MarketDataResult(
             market=self.market,
