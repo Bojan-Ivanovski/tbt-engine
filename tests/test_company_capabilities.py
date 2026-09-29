@@ -115,6 +115,20 @@ class CompanyCapabilityTests(unittest.TestCase):
         self.assertIsNone(available.reason)
         self.assertEqual(unavailable.availability, CompanyDataAvailability.UNAVAILABLE)
 
+    def test_result_records_are_normalized_to_an_immutable_tuple(self) -> None:
+        records = ["record"]
+
+        result = CompanyDataResult[str](
+            company=self.company,
+            source=self.source,
+            availability=CompanyDataAvailability.AVAILABLE,
+            records=records,  # pyright: ignore[reportArgumentType]
+        )
+        records.append("later mutation")
+
+        self.assertEqual(result.records, ("record",))
+        self.assertIsInstance(result.records, tuple)
+
     def test_partial_and_unavailable_results_enforce_their_invariants(self) -> None:
         partial = CompanyDataResult(
             company=self.company,

@@ -48,6 +48,7 @@ class CompanyDataResult(Generic[T]):
     reason: str | None = None
 
     def __post_init__(self) -> None:
+        records = tuple(self.records)
         reason = self.reason.strip() if self.reason is not None else None
         if reason == "":
             raise ValueError("Company data availability reason must not be empty")
@@ -56,11 +57,12 @@ class CompanyDataResult(Generic[T]):
             if reason is not None:
                 raise ValueError("Available company data must not include a failure reason")
         elif self.availability is CompanyDataAvailability.PARTIAL:
-            if not self.records or reason is None:
+            if not records or reason is None:
                 raise ValueError("Partial company data requires records and a reason")
-        elif not reason or self.records:
+        elif not reason or records:
             raise ValueError("Unavailable company data requires a reason and no records")
 
+        object.__setattr__(self, "records", records)
         object.__setattr__(self, "reason", reason)
 
 
