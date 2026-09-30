@@ -7,7 +7,7 @@ from tbt_engine.providers.capabilities.macro import MacroCapabilities
 from tbt_engine.providers.capabilities.market import MarketCapabilities
 from tbt_engine.providers.capabilities.textual import TextualCapabilities
 from tbt_engine.providers.provider import Provider
-from tbt_engine.providers.yahoo_provider import YahooProvider
+from tbt_engine.providers.yahoo.provider import YahooProvider
 
 __all__ = [
     "Capabilities",

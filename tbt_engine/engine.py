@@ -26,7 +26,7 @@ class Engine:
         result_collector: ResultCollector | None = None,
     ):
         if provider is None:
-            from tbt_engine.providers.yahoo_provider import YahooProvider
+            from tbt_engine.providers.yahoo.provider import YahooProvider
 
             provider = YahooProvider()
 
