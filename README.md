@@ -41,6 +41,43 @@ from tbt_engine import Engine, Market, Strategy
 
 Market-data providers, phase-specific market snapshots, orders, portfolio snapshots, and result types are also available from the top-level package. To use another market data source, implement `Provider.get_history()` and pass the provider to `Engine`. Price history must contain `Open` and `Close` columns.
 
+Providers compose domain-specific `Capabilities` objects containing optional `Capability`
+implementations. Every capability has a stable `CapabilityId` used by
+`Provider.supported_capabilities`, while typed capability classes support safe lookup through
+`Provider.require_capability()`. Missing capabilities and domain collections fail explicitly instead
+of requiring method probing. Shared capability contracts live under
+`tbt_engine.providers.capabilities`; concrete provider adapters remain directly under
+`tbt_engine.providers`. Normalized records use `SourceMetadata` for provider provenance and an aware
+retrieval time. Optional capability collections are available as
+`CompanyCapabilities`, `MarketCapabilities`, `MacroCapabilities`,
+`DerivedCapabilities`, and `TextualCapabilities`; each provider may expose only
+the leaf contracts it genuinely supports. Unsupported capability identifiers
+remain explicit through `Provider.require_capability()` and supported requests
+use normalized availability results rather than provider-shaped responses. The
+existing `get_history()` method remains the compatibility path alongside the
+normalized `company.ohlcv` capability.
+
+### Instrument identity and trading calendars
+
+Provider symbols are resolved separately from stable instrument identities. An
+`InstrumentIdentifier` names the security under an explicit authority such as
+FIGI, while `ProviderSymbolMapping` records the provider symbol, optional MIC,
+and its inclusive-start/exclusive-end validity range. `SymbolMap` performs
+point-in-time lookup in either direction, so a symbol change does not create a
+new instrument and a reused symbol can be disambiguated by exchange.
+
+`TradingCalendar` uses an IANA timezone, weekday schedules, explicit closures,
+and exceptional-session overrides. Session boundaries may fall on the previous
+or following calendar day, supporting overnight markets as well as regular and
+extended equity hours. `normalize_timestamp()` converts aware timestamps—or
+naive timestamps accompanied by an explicit source timezone—to UTC;
+`align_timestamp()` then classifies the instant as pre-market, regular,
+post-market, or closed. Calendar data is injected explicitly rather than fetched
+at runtime, keeping backtests deterministic and allowing provider adapters or
+consuming applications to choose their calendar data source. Company and market
+record metadata may carry a `TradingSessionIdentifier`, allowing prices,
+corporate events, and market context to point to the same labeled session.
+
 The starting state is supplied as one immutable portfolio definition:
 
 ```python
