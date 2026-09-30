@@ -57,6 +57,35 @@ use normalized availability results rather than provider-shaped responses. The
 existing `get_history()` method remains the compatibility path alongside the
 normalized `company.ohlcv` capability.
 
+### Yahoo Finance capabilities
+
+`YahooProvider` advertises the normalized Yahoo Finance surfaces that can be
+mapped to engine contracts:
+
+- company OHLCV, fundamentals, earnings, corporate actions, and news;
+- S&P 500, Nasdaq, sector ETF, and VIX observations;
+- commodity futures and foreign-exchange observations;
+- market news and entity-scoped major announcements.
+
+Use `supported_capabilities`, `supports(...)`, and `require_capability(...)` to
+discover and obtain these implementations. Yahoo symbols use a
+`CompanyIdentifier` or `MarketIdentifier` with the `ticker` or `yahoo` scheme;
+an optional MIC is passed through to yfinance. Commodity futures use Yahoo
+tickers ending in `=F`, while currency pairs use tickers ending in `=X`.
+
+Capability support does not imply that every valid query or record family is
+available from Yahoo. For example, the S&P 500 and Nasdaq capabilities expose
+index observations but return an explicit unavailable result for constituent
+history, and the sector ETF capability does the same for effective-dated
+company mappings. Yahoo does not provide trustworthy historical availability
+times for every company record, so those values remain absent where the source
+does not establish them. Provider request, response, authentication, and rate
+limit failures use the shared provider exception hierarchy.
+
+The adapter accepts injected ticker/search factories and a clock for
+deterministic offline testing. Core tests do not depend on live Yahoo Finance
+responses.
+
 ### Instrument identity and trading calendars
 
 Provider symbols are resolved separately from stable instrument identities. An
