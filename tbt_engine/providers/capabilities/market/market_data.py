@@ -3,6 +3,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Generic, TypeVar
 
+from tbt_engine.instruments import TradingSessionIdentifier
 from tbt_engine.metadata import SourceMetadata
 from tbt_engine.providers.capabilities.market.market_identifier import MarketIdentifier
 
@@ -25,6 +26,7 @@ class MarketDataMetadata:
     source: SourceMetadata
     effective_at: date | datetime
     available_at: datetime | None = None
+    session: TradingSessionIdentifier | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.effective_at, datetime) and (

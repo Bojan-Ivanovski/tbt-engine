@@ -57,6 +57,27 @@ use normalized availability results rather than provider-shaped responses. The
 existing `get_history()` method remains the compatibility path alongside the
 normalized `company.ohlcv` capability.
 
+### Instrument identity and trading calendars
+
+Provider symbols are resolved separately from stable instrument identities. An
+`InstrumentIdentifier` names the security under an explicit authority such as
+FIGI, while `ProviderSymbolMapping` records the provider symbol, optional MIC,
+and its inclusive-start/exclusive-end validity range. `SymbolMap` performs
+point-in-time lookup in either direction, so a symbol change does not create a
+new instrument and a reused symbol can be disambiguated by exchange.
+
+`TradingCalendar` uses an IANA timezone, weekday schedules, explicit closures,
+and exceptional-session overrides. Session boundaries may fall on the previous
+or following calendar day, supporting overnight markets as well as regular and
+extended equity hours. `normalize_timestamp()` converts aware timestamps—or
+naive timestamps accompanied by an explicit source timezone—to UTC;
+`align_timestamp()` then classifies the instant as pre-market, regular,
+post-market, or closed. Calendar data is injected explicitly rather than fetched
+at runtime, keeping backtests deterministic and allowing provider adapters or
+consuming applications to choose their calendar data source. Company and market
+record metadata may carry a `TradingSessionIdentifier`, allowing prices,
+corporate events, and market context to point to the same labeled session.
+
 The starting state is supplied as one immutable portfolio definition:
 
 ```python
